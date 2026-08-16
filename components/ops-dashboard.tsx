@@ -101,8 +101,7 @@ function DocumentModal({ onClose, onCreate }: { onClose: () => void; onCreate: (
 
 function TripOpsReport({ trips }: { trips: Trip[] }) {
   const [statusFilter, setStatusFilter] = useState('All')
-  const [driverFilter, setDriverFilter] = useState('')
-  const [sourceFilter, setSourceFilter] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Summary — all from real trips data
   const total     = trips.length
@@ -124,11 +123,18 @@ function TripOpsReport({ trips }: { trips: Trip[] }) {
     delivery:    t.estimatedDropDate || t.date,
   }))
 
-  const filteredRows = rows.filter(r =>
-    (statusFilter === 'All' || r.status === statusFilter) &&
-    (!driverFilter || r.driver.toLowerCase().includes(driverFilter.toLowerCase())) &&
-    (!sourceFilter || r.source.toLowerCase().includes(sourceFilter.toLowerCase()))
-  )
+  const filteredRows = rows.filter(r => {
+    const matchesStatus = statusFilter === 'All' || r.status === statusFilter;
+    const q = searchQuery.toLowerCase().trim();
+    const matchesQuery = !q ||
+      r.id.toLowerCase().includes(q) ||
+      r.source.toLowerCase().includes(q) ||
+      r.destination.toLowerCase().includes(q) ||
+      r.driver.toLowerCase().includes(q) ||
+      r.loadType.toLowerCase().includes(q) ||
+      r.weight.toLowerCase().includes(q);
+    return matchesStatus && matchesQuery;
+  })
 
   const handleDownloadExcel = async () => {
     const XLSX = await import('xlsx');
@@ -164,7 +170,7 @@ function TripOpsReport({ trips }: { trips: Trip[] }) {
       'Scheduled':   { bg: '#dbeafe', color: '#1d4ed8' },
     }
     const c = map[s] ?? { bg: '#f1f5f9', color: '#475569' }
-    return <span style={{ padding: '0.25rem 0.625rem', borderRadius: 9999, fontSize: '0.75rem', fontWeight: 600, background: c.bg, color: c.color }}>{s}</span>
+    return <span style={{ display: 'inline-block', padding: '0.2rem 0.6rem', borderRadius: 9999, fontSize: '0.75rem', fontWeight: 500, whiteSpace: 'nowrap', background: c.bg, color: c.color }}>{s}</span>
   }
 
   return (
@@ -210,8 +216,7 @@ function TripOpsReport({ trips }: { trips: Trip[] }) {
           </button>
         </div>
         <div className="filters" style={{ flexWrap: 'wrap' }}>
-          <div className="search"><input value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} placeholder="⌕ Source / origin" style={{ minWidth: 160 }} /></div>
-          <div className="search"><input value={driverFilter} onChange={e => setDriverFilter(e.target.value)} placeholder="⌕ Driver" style={{ minWidth: 120 }} /></div>
+          <div className="search">⌕ <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search trip ID, source, destination, driver..." /></div>
           <div className="filter-group">{['All', 'Scheduled', 'In progress', 'Completed'].map(s => <button key={s} className={statusFilter === s ? 'filter active' : 'filter'} onClick={() => setStatusFilter(s)}>{s}</button>)}</div>
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -231,7 +236,7 @@ function TripOpsReport({ trips }: { trips: Trip[] }) {
                   <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{row.loadType}</td>
                   <td style={{ padding: '0.75rem 1rem', color: '#475569', textAlign: 'right' }}>{row.weight}</td>
                   <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{row.driver}</td>
-                  <td style={{ padding: '0.75rem 1rem' }}>{statusChip(row.status)}</td>
+                  <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>{statusChip(row.status)}</td>
                   <td style={{ padding: '0.75rem 1rem', color: '#475569', whiteSpace: 'nowrap' }}>{row.delivery}</td>
                 </tr>
               ))}
@@ -261,8 +266,7 @@ function TripOpsReport({ trips }: { trips: Trip[] }) {
 }
 
 function FuelExpenseReport({ trips }: { trips: Trip[] }) {
-  const [driverFilter, setDriverFilter] = useState('')
-  const [tripFilter, setTripFilter] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
 
   const dummyRows = [
     { trip: 'TR-001', driver: 'Rahul', truck: 'MH13AB1234', fuelAuth: '120 L', fuelRec: '115 L', authN: 120, recN: 115, cash: '₹2,000', extraFuel: false },
@@ -270,10 +274,13 @@ function FuelExpenseReport({ trips }: { trips: Trip[] }) {
     { trip: 'TR-003', driver: 'Sagar', truck: 'MH13EF9012', fuelAuth: '130 L', fuelRec: '125 L', authN: 130, recN: 125, cash: '₹2,500', extraFuel: false },
   ]
 
-  const filteredRows = dummyRows.filter(r =>
-    (!driverFilter || r.driver.toLowerCase().includes(driverFilter.toLowerCase())) &&
-    (!tripFilter   || r.trip.toLowerCase().includes(tripFilter.toLowerCase()))
-  )
+  const filteredRows = dummyRows.filter(r => {
+    const q = searchQuery.toLowerCase().trim();
+    return !q ||
+      r.trip.toLowerCase().includes(q) ||
+      r.driver.toLowerCase().includes(q) ||
+      r.truck.toLowerCase().includes(q);
+  })
 
   const totalAuth = dummyRows.reduce((s, r) => s + r.authN, 0)
   const totalRec  = dummyRows.reduce((s, r) => s + r.recN,  0)
@@ -293,8 +300,7 @@ function FuelExpenseReport({ trips }: { trips: Trip[] }) {
       <div className="panel">
         <div className="panel-header"><div><h2>Fuel & Expense Breakdown</h2><p>Per-trip fuel and cash advance summary</p></div></div>
         <div className="filters" style={{ flexWrap: 'wrap' }}>
-          <div className="search"><input value={driverFilter} onChange={e => setDriverFilter(e.target.value)} placeholder="⌕ Driver" style={{ minWidth: 140 }} /></div>
-          <div className="search"><input value={tripFilter} onChange={e => setTripFilter(e.target.value)} placeholder="⌕ Trip ID" style={{ minWidth: 120 }} /></div>
+          <div className="search">⌕ <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search trip ID, driver, truck..." /></div>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
