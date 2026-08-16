@@ -43,26 +43,78 @@
     "documents": [
       {
         "id": "doc-1",
+        "tripId": "req-1046",
         "name": "DR-1046-LR.pdf",
         "type": "LR",
         "uploadedAt": "17 Aug 2026 · 13:35"
+      },
+      {
+        "id": "doc-1786894023028",
+        "name": "Devang_Gentyal_AI_VIT.pdf",
+        "type": "LR",
+        "uploadedAt": "Just now",
+        "tripId": "req-1046"
       }
     ],
     "extras": [
       {
-        "id": "ex-1",
+        "id": "ex-1786894001248",
         "type": "Fuel",
-        "amount": "₹8,400",
-        "note": "Refuelling top-up requested at Cuttack bypass",
-        "status": "Submitted"
-      },
-      {
-        "id": "ex-1786893392993",
-        "type": "Cash",
-        "amount": "₹0",
-        "note": "Submitted by driver for review",
-        "status": "Submitted"
+        "amount": "₹5000",
+        "note": "my disel got stolen",
+        "status": "Submitted",
+        "tripId": "req-1046"
       }
     ]
+  },
+  {
+    "id": "req-1786901456895",
+    "reference": "DR-121",
+    "customer": "Ultratech",
+    "origin": "Pune",
+    "destination": "Mumbai",
+    "date": "17 Aug 2026",
+    "time": "10:00 AM",
+    "requestedDeliveryDate": "18 Aug 2026",
+    "requestedDeliveryTime": "10:00 AM",
+    "cargoMaterial": "Cement",
+    "cargoCompany": "Ultratech",
+    "cargoWeight": "50 tons",
+    "cargoType": "Bagged",
+    "noOfBags": "100",
+    "createdAt": "16 Aug 2026 · 12:00 PM",
+    "passengers": 100,
+    "status": "Accepted",
+    "driver": "Ramesh Yadav",
+    "driverNumber": "DRV-021",
+    "tripStatus": "Scheduled",
+    "pickupDate": "17 Aug 2026",
+    "pickupTime": "10:00 AM",
+    "estimatedDropDate": "17 Aug 2026",
+    "estimatedDropTime": "10:00 AM",
+    "cargo": {
+      "material": "Cement",
+      "company": "Ultratech",
+      "quantity": "28 tonnes",
+      "loadType": "Bagged"
+    },
+    "truck": {
+      "number": "Pending assignment",
+      "type": "Body",
+      "configuration": "12 tyre",
+      "brand": "Tata Motors"
+    },
+    "fuel": {
+      "assigned": "120 L",
+      "received": "Awaiting receipt",
+      "station": "To be assigned",
+      "fulfilledAt": "Not fulfilled"
+    },
+    "cash": {
+      "advance": "₹0",
+      "paymentMode": "UPI"
+    },
+    "documents": [],
+    "extras": []
   }
 ]
