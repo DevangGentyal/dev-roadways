@@ -1,0 +1,10 @@
+[
+  {
+    "id": "ex-1786894001248",
+    "type": "Fuel",
+    "amount": "₹5000",
+    "note": "my disel got stolen",
+    "status": "Submitted",
+    "tripId": "req-1046"
+  }
+]

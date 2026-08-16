@@ -1,0 +1,10 @@
+{
+  "roles":["Coordinator","Operations","Driver"],
+  "drivers":[{"name":"Ramesh Yadav","number":"DRV-021"},{"name":"Suresh Kumar","number":"DRV-022"}],
+  "companies":["Ultratech Cement","Chettinad Cement","Dalmia Cement","Shree Cement"],
+  "extraTypes":["Fuel","Cash","AdBlue"],
+  "documentTypes":["LR","WB","Invoice","Other"],
+  "locations":["Wadgaon, Pune","Nashik MIDC","Ariyalur Plant","Coimbatore","Rajgangpur Plant","Bhubaneswar","Beawar Plant","Jaipur"],
+  "truckTypes":["Body","Open"],
+  "configurations":["10 tyre","12 tyre","14 tyre","16 tyre"]
+}

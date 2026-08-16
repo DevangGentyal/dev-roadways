@@ -1,0 +1,68 @@
+[
+  {
+    "id": "req-1046",
+    "reference": "DR-1046",
+    "customer": "Dalmia Cement",
+    "origin": "Rajgangpur Plant",
+    "destination": "Bhubaneswar",
+    "date": "17 Aug 2026",
+    "time": "13:15",
+    "createdAt": "16 Aug 2026 · 09:20 AM",
+    "passengers": 28,
+    "status": "Accepted",
+    "driver": "Ramesh Yadav",
+    "driverNumber": "9421659207",
+    "tripStatus": "In progress",
+    "pickupDate": "17 Aug 2026",
+    "pickupTime": "13:15",
+    "estimatedDropDate": "17 Aug 2026",
+    "estimatedDropTime": "18:30",
+    "cargo": {
+      "material": "Cement",
+      "company": "Dalmia Cement",
+      "quantity": "28 tonnes",
+      "noOfBags": "560 bags",
+      "loadType": "Bagged"
+    },
+    "truck": {
+      "number": "OD 14 AB 4721",
+      "type": "Body",
+      "configuration": "12 tyre",
+      "brand": "Tata Motors"
+    },
+    "fuel": {
+      "assigned": "120 L",
+      "received": "120 L",
+      "station": "Indian Oil, Cuttack Bypass",
+      "fulfilledAt": "17 Aug 2026 · 13:35"
+    },
+    "cash": {
+      "advance": "₹25,000",
+      "paymentMode": "UPI"
+    },
+    "documents": [
+      {
+        "id": "doc-1",
+        "name": "DR-1046-LR.pdf",
+        "type": "LR",
+        "uploadedAt": "17 Aug 2026 · 13:35"
+      }
+    ],
+    "extras": [
+      {
+        "id": "ex-1",
+        "type": "Fuel",
+        "amount": "₹8,400",
+        "note": "Refuelling top-up requested at Cuttack bypass",
+        "status": "Submitted"
+      },
+      {
+        "id": "ex-1786893392993",
+        "type": "Cash",
+        "amount": "₹0",
+        "note": "Submitted by driver for review",
+        "status": "Submitted"
+      }
+    ]
+  }
+]
