@@ -1,6 +1,35 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import {
+  House,
+  ClipboardText,
+  Truck,
+  ChartPie,
+  GasPump,
+  List,
+  CaretDown,
+  Bell,
+  UploadSimple,
+  Plus,
+  PencilSimple,
+  DownloadSimple,
+  ArrowLeft,
+  MagnifyingGlass,
+  CaretRight,
+  ArrowRight,
+  X,
+  QuestionMark,
+  DotsThree,
+  Check,
+  WarningCircle,
+  CurrencyInr,
+  Drop,
+  FileText,
+  Clock,
+  CheckCircle,
+  XCircle,
+} from '@phosphor-icons/react'
 
 type Role = 'Coordinator' | 'Operations' | 'Driver' | 'Super Admin'
 type RequestStatus = 'Pending' | 'Accepted' | 'Rejected'
@@ -61,43 +90,322 @@ export default function OpsDashboard() {
 
   const title = view === 'dashboard' ? 'Good morning, Alex' : view === 'requests' || view === 'request-detail' ? 'Trip requests' : view === 'trips' || view === 'trip-detail' ? 'Trips' : view === 'reports-ops' ? 'Trip Operations Report' : view === 'reports-fuel' ? 'Fuel & Trip Expense Report' : 'Overview'
   return <div className="app-shell">
-    <aside className="sidebar"><div className="brand"><span className="brand-mark">D</span><span>Dev Roadways</span></div><div className="workspace">Operations workspace <span>⌄</span></div><nav>{role === 'Super Admin' ? <><NavItem active={view === 'reports-ops'} label="Trip Operations" onClick={() => setView('reports-ops')} icon="◉" /><NavItem active={view === 'reports-fuel'} label="Fuel & Expenses" onClick={() => setView('reports-fuel')} icon="◈" /></> : <>{role !== 'Driver' && <><NavItem active={view === 'dashboard'} label="Overview" onClick={() => setView('dashboard')} icon="⌂" /><NavItem active={view === 'requests'} label="Trip requests" count={pending.length} onClick={() => setView('requests')} icon="▣" /></>}<NavItem active={view === 'trips'} label="Trips" onClick={() => setView('trips')} icon="↗" /></>}</nav><div className="sidebar-bottom"><div className="help">?<span>Help centre</span></div><div className="profile"><span className="avatar">AC</span><span><b>Alex Cooper</b><small>{role}</small></span><span className="more">•••</span></div></div></aside>
-    <main className="main"><header className="topbar"><button className="mobile-menu" aria-label="Open menu" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}>☰</button><div className="crumb">{role === 'Super Admin' ? 'Admin' : 'Operations'} <span>/</span> {view === 'dashboard' ? 'Overview' : title}</div><div className="top-actions"><button className="icon-button" aria-label="Notifications">♧</button><div className="role-switch"><span>Viewing as</span><select value={role} onChange={(e) => { setRole(e.target.value as Role); setView(e.target.value === 'Driver' ? 'trips' : e.target.value === 'Super Admin' ? 'reports-ops' : 'dashboard') }} aria-label="Select role"><option>Coordinator</option><option>Operations</option><option>Driver</option><option>Super Admin</option></select></div></div></header>
-      <div className="content">{!dbReady && !dbError && <div className="panel db-state">Loading mock database…</div>}{dbError && <div className="panel db-state error">{dbError}</div>}{dbReady && <><div className="page-heading"><div><h1>{title}</h1>{view === 'dashboard' && <p className="subheading">Keep every journey moving, from request to arrival.</p>}</div>{role === 'Coordinator' && view === 'dashboard' && <div className="heading-actions"><button className="button secondary" onClick={() => setShowImport(true)}>↥ <span>Import Excel</span></button><button className="button primary" onClick={() => setShowCreate(true)}>＋ <span>New request</span></button></div>}</div>
-      {view === 'dashboard' && role !== 'Driver' && <Dashboard pending={pending} accepted={accepted} requests={requests} trips={trips} onOpen={(r) => { setSelected(r); setView('request-detail') }} onOpenTrip={(t) => { setSelected(t); setView('trip-detail') }} onViewAll={() => setView('trips')} onViewAllRequests={() => setView('requests')} />}
-      {view === 'requests' && role !== 'Driver' && <RequestList requests={visibleRequests} onOpen={(r) => { setSelected(r); setView('request-detail') }} onCreate={() => setShowCreate(true)} onImport={() => setShowImport(true)} />}
-      {view === 'request-detail' && selected && <RequestDetail request={selected as Request} role={role} onBack={() => setView('requests')} onAccept={acceptRequest} onReject={rejectRequest} onReminder={() => sendReminder(selected as Request)} onEdit={() => { if (role !== 'Driver') setEditTarget(selected as Request) }} />}
-      {view === 'trips' && <TripList trips={visibleTrips} onOpen={(t) => { setSelected(t); setView('trip-detail') }} />}
-      {view === 'trip-detail' && selected && <><TripDetail trip={selected as Trip} role={role} onBack={() => setView('trips')} onExtra={() => setShowExtra(true)} onDocument={() => setShowDocument(true)} onEdit={() => { if (role !== 'Driver') setEditTarget(selected as Trip) }} /></>}{view === 'reports-ops' && <TripOpsReport trips={trips} />}{view === 'reports-fuel' && <FuelExpenseReport trips={trips} />}
-      </>}</div>
+    <aside className="sidebar">
+      <div className="brand"><span className="brand-mark">D</span><span>Dev Roadways</span></div>
+      <div className="workspace">Operations workspace <CaretDown size={14} style={{ display: 'inline', marginLeft: 4 }} /></div>
+      <nav>
+        {role === 'Super Admin' ? (
+          <>
+            <NavItem active={view === 'reports-ops'} label="Trip Operations" onClick={() => setView('reports-ops')} icon={<ChartPie size={18} />} />
+            <NavItem active={view === 'reports-fuel'} label="Fuel & Expenses" onClick={() => setView('reports-fuel')} icon={<GasPump size={18} />} />
+          </>
+        ) : (
+          <>
+            {role !== 'Driver' && (
+              <>
+                <NavItem active={view === 'dashboard'} label="Overview" onClick={() => setView('dashboard')} icon={<House size={18} />} />
+                <NavItem active={view === 'requests'} label="Trip requests" count={pending.length} onClick={() => setView('requests')} icon={<ClipboardText size={18} />} />
+              </>
+            )}
+            <NavItem active={view === 'trips'} label="Trips" onClick={() => setView('trips')} icon={<Truck size={18} />} />
+          </>
+        )}
+      </nav>
+      <div className="sidebar-bottom">
+        <div className="help"><QuestionMark size={16} /><span>Help centre</span></div>
+        <div className="profile"><span className="avatar">AC</span><span><b>Alex Cooper</b><small>{role}</small></span><span className="more"><DotsThree size={18} /></span></div>
+      </div>
+    </aside>
+
+    <main className="main">
+      <header className="topbar">
+        <button className="mobile-menu" aria-label="Open menu" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}><List size={20} /></button>
+        <div className="crumb">{role === 'Super Admin' ? 'Admin' : 'Operations'} <span>/</span> {view === 'dashboard' ? 'Overview' : title}</div>
+        <div className="top-actions">
+          <button className="icon-button" aria-label="Notifications"><Bell size={18} /></button>
+          <div className="role-switch">
+            <span>Viewing as</span>
+            <select value={role} onChange={(e) => { setRole(e.target.value as Role); setView(e.target.value === 'Driver' ? 'trips' : e.target.value === 'Super Admin' ? 'reports-ops' : 'dashboard') }} aria-label="Select role">
+              <option>Coordinator</option>
+              <option>Operations</option>
+              <option>Driver</option>
+              <option>Super Admin</option>
+            </select>
+          </div>
+        </div>
+      </header>
+
+      <div className="content">
+        {!dbReady && !dbError && <div className="panel db-state">Loading mock database…</div>}
+        {dbError && <div className="panel db-state error">{dbError}</div>}
+        {dbReady && (
+          <>
+            <div className="page-heading">
+              <div>
+                <h1>{title}</h1>
+                {view === 'dashboard' && <p className="subheading">Keep every journey moving, from request to arrival.</p>}
+              </div>
+              {role === 'Coordinator' && view === 'dashboard' && (
+                <div className="heading-actions">
+                  <button className="button secondary" onClick={() => setShowImport(true)}><UploadSimple size={16} style={{ display: 'inline', marginRight: 6 }} /><span>Import Excel</span></button>
+                  <button className="button primary" onClick={() => setShowCreate(true)}><Plus size={16} style={{ display: 'inline', marginRight: 6 }} /><span>New request</span></button>
+                </div>
+              )}
+            </div>
+
+            {view === 'dashboard' && role !== 'Driver' && <Dashboard pending={pending} accepted={accepted} requests={requests} trips={trips} onOpen={(r) => { setSelected(r); setView('request-detail') }} onOpenTrip={(t) => { setSelected(t); setView('trip-detail') }} onViewAll={() => setView('trips')} onViewAllRequests={() => setView('requests')} />}
+            {view === 'requests' && role !== 'Driver' && <RequestList requests={visibleRequests} onOpen={(r) => { setSelected(r); setView('request-detail') }} onCreate={() => setShowCreate(true)} onImport={() => setShowImport(true)} />}
+            {view === 'request-detail' && selected && <RequestDetail request={selected as Request} role={role} onBack={() => setView('requests')} onAccept={acceptRequest} onReject={rejectRequest} onReminder={() => sendReminder(selected as Request)} onEdit={() => { if (role !== 'Driver') setEditTarget(selected as Request) }} />}
+            {view === 'trips' && <TripList trips={visibleTrips} onOpen={(t) => { setSelected(t); setView('trip-detail') }} />}
+            {view === 'trip-detail' && selected && <><TripDetail trip={selected as Trip} role={role} onBack={() => setView('trips')} onExtra={() => setShowExtra(true)} onDocument={() => setShowDocument(true)} onEdit={() => { if (role !== 'Driver') setEditTarget(selected as Trip) }} /></>}
+            {view === 'reports-ops' && <TripOpsReport trips={trips} />}
+            {view === 'reports-fuel' && <FuelExpenseReport trips={trips} />}
+          </>
+        )}
+      </div>
     </main>
-    {mobileNavOpen && <div className="mobile-nav-layer" role="presentation" onClick={() => setMobileNavOpen(false)}><aside className="mobile-drawer" role="dialog" aria-label="Mobile navigation" onClick={(event) => event.stopPropagation()}><div className="mobile-drawer-header"><div className="brand"><span className="brand-mark">D</span><span>Dev Roadways</span></div><button className="drawer-close" aria-label="Close menu" onClick={() => setMobileNavOpen(false)}>×</button></div><div className="workspace">Operations workspace <span>⌄</span></div><nav>{role === 'Super Admin' ? <><NavItem active={view === 'reports-ops'} label="Trip Operations" onClick={() => { setView('reports-ops'); setMobileNavOpen(false) }} icon="◉" /><NavItem active={view === 'reports-fuel'} label="Fuel & Expenses" onClick={() => { setView('reports-fuel'); setMobileNavOpen(false) }} icon="◈" /></> : <>{role !== 'Driver' && <><NavItem active={view === 'dashboard'} label="Overview" onClick={() => { setView('dashboard'); setMobileNavOpen(false) }} icon="⌂" /><NavItem active={view === 'requests'} label="Trip requests" count={pending.length} onClick={() => { setView('requests'); setMobileNavOpen(false) }} icon="▣" /></>}<NavItem active={view === 'trips'} label="Trips" onClick={() => { setView('trips'); setMobileNavOpen(false) }} icon="↗" /></>}</nav><div className="mobile-drawer-footer"><div className="help">?<span>Help centre</span></div><div className="profile"><span className="avatar">AC</span><span><b>Alex Cooper</b><small>{role}</small></span></div></div></aside></div>}
-    {toast && <div className="toast">✓ {toast}</div>}
-    {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreate={addRequest} />}{showImport && <ImportModal onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); notify('Excel preview validated — 2 requests ready') }} />}{showExtra && <ExtraModal onClose={() => setShowExtra(false)} onCreate={addExtra} />}{showDocument && <DocumentModal onClose={() => setShowDocument(false)} onCreate={addDocument} />}{editTarget && <EditModal entity={editTarget} onClose={() => setEditTarget(null)} onSave={updateEntity} />}
+
+    {mobileNavOpen && (
+      <div className="mobile-nav-layer" role="presentation" onClick={() => setMobileNavOpen(false)}>
+        <aside className="mobile-drawer" role="dialog" aria-label="Mobile navigation" onClick={(event) => event.stopPropagation()}>
+          <div className="mobile-drawer-header">
+            <div className="brand"><span className="brand-mark">D</span><span>Dev Roadways</span></div>
+            <button className="drawer-close" aria-label="Close menu" onClick={() => setMobileNavOpen(false)}><X size={18} /></button>
+          </div>
+          <div className="workspace">Operations workspace <CaretDown size={14} style={{ display: 'inline', marginLeft: 4 }} /></div>
+          <nav>
+            {role === 'Super Admin' ? (
+              <>
+                <NavItem active={view === 'reports-ops'} label="Trip Operations" onClick={() => { setView('reports-ops'); setMobileNavOpen(false) }} icon={<ChartPie size={18} />} />
+                <NavItem active={view === 'reports-fuel'} label="Fuel & Expenses" onClick={() => { setView('reports-fuel'); setMobileNavOpen(false) }} icon={<GasPump size={18} />} />
+              </>
+            ) : (
+              <>
+                {role !== 'Driver' && (
+                  <>
+                    <NavItem active={view === 'dashboard'} label="Overview" onClick={() => { setView('dashboard'); setMobileNavOpen(false) }} icon={<House size={18} />} />
+                    <NavItem active={view === 'requests'} label="Trip requests" count={pending.length} onClick={() => { setView('requests'); setMobileNavOpen(false) }} icon={<ClipboardText size={18} />} />
+                  </>
+                )}
+                <NavItem active={view === 'trips'} label="Trips" onClick={() => { setView('trips'); setMobileNavOpen(false) }} icon={<Truck size={18} />} />
+              </>
+            )}
+          </nav>
+          <div className="mobile-drawer-footer">
+            <div className="help"><QuestionMark size={16} /><span>Help centre</span></div>
+            <div className="profile"><span className="avatar">AC</span><span><b>Alex Cooper</b><small>{role}</small></span></div>
+          </div>
+        </aside>
+      </div>
+    )}
+
+    {toast && <div className="toast"><Check size={16} style={{ display: 'inline', marginRight: 6, color: '#10b981' }} /> {toast}</div>}
+    {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreate={addRequest} />}
+    {showImport && <ImportModal onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); notify('Excel preview validated — 2 requests ready') }} />}
+    {showExtra && <ExtraModal onClose={() => setShowExtra(false)} onCreate={addExtra} />}
+    {showDocument && <DocumentModal onClose={() => setShowDocument(false)} onCreate={addDocument} />}
+    {editTarget && <EditModal entity={editTarget} onClose={() => setEditTarget(null)} onSave={updateEntity} />}
   </div>
 }
-function NavItem({ label, icon, count, active, onClick }: { label: string; icon: string; count?: number; active?: boolean; onClick: () => void }) { return <button className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}><span>{icon}</span>{label}{count ? <em>{count}</em> : null}</button> }
-function Status({ children }: { children: string }) { return <span className={`status ${children.toLowerCase().replace(' ', '-')}`}>{children}</span> }
-function Dashboard({ pending, accepted, requests, trips, onOpen, onOpenTrip, onViewAll, onViewAllRequests }: { pending: Request[]; accepted: Request[]; requests: Request[]; trips: Trip[]; onOpen: (r: Request) => void; onOpenTrip: (t: Trip) => void; onViewAll: () => void; onViewAllRequests: () => void }) { const recentTrips = [...trips].sort((a, b) => b.date.localeCompare(a.date)); const recentRequests = [...requests].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 1); return <><section className="stats"><Stat label="Pending requests" value={pending.length} tone="blue" hint="Needs review" /><Stat label="Trips this week" value={accepted.length + 2} tone="green" hint="Across all drivers" /><Stat label="Active trips" value={trips.filter((t) => t.tripStatus === 'In progress').length} tone="purple" hint="Currently moving" /></section><section className="section-grid"><div className="panel"><div className="panel-header"><div><h2>Trip requests</h2><p>Requests awaiting review or action.</p></div><button className="text-button" onClick={onViewAllRequests}>View all →</button></div><div className="request-stack">{recentRequests.map((request) => <RequestCard key={request.id} request={request} onClick={() => onOpen(request)} />)}</div>{!recentRequests.length && <Empty label="No trip requests yet" />}</div><div className="panel"><div className="panel-header"><div><h2>Trips</h2><p>Recently created and scheduled journeys.</p></div><button className="text-button" onClick={onViewAll}>View all →</button></div><div className="request-stack">{recentTrips.map((trip) => <TripRow key={trip.id} trip={trip} onClick={() => onOpenTrip(trip)} />)}</div>{!recentTrips.length && <Empty label="No trips yet" />}</div></section></> }
-function Stat({ label, value, hint, tone }: { label: string; value: string | number; hint: string; tone: string }) { return <div className="stat"><span className={`stat-icon ${tone}`}>{tone === 'blue' ? '◷' : tone === 'green' ? '↗' : '▣'}</span><div><p>{label}</p><strong>{value}</strong><small>{hint}</small></div></div> }
-function TripRow({ trip, onClick }: { trip: Trip; onClick: () => void }) { return <button className="trip-card" onClick={onClick}><span className="trip-date"><b>{trip.date.split(' ')[0]}</b><small>{trip.date.split(' ')[1]}</small></span><span className="request-main"><b>{trip.reference} · {trip.customer}</b><small>{trip.origin} <i>→</i> {trip.destination}</small></span><Status>{trip.tripStatus}</Status><span className="chevron">›</span></button> }
-function RequestRow({ request, onClick }: { request: Request; onClick: () => void }) { return <button className="request-row" onClick={onClick}><span className="request-icon">↗</span><span className="request-main"><b>{request.reference}</b><small>{request.origin} <i>→</i> {request.destination}</small></span><span className="request-date"><b>{request.date}</b><small>{request.time} · {request.passengers} passengers</small></span><Status>{request.status}</Status><span className="chevron">›</span></button> }
-function RequestCard({ request, onClick }: { request: Request; onClick: () => void }) { return <button className="request-card" onClick={onClick}><span className="request-icon">↗</span><span className="request-main"><b>{request.reference} · {request.customer}</b><small>{request.origin} <i>→</i> {request.destination}</small><small>{request.date} · {request.time} · {request.passengers} bags</small></span><Status>{request.status}</Status><span className="chevron">›</span></button> }
-function RequestList({ requests, onOpen, onCreate, onImport }: { requests: Request[]; onOpen: (r: Request) => void; onCreate: () => void; onImport: () => void }) { const [filter, setFilter] = useState('All'); const [query, setQuery] = useState(''); const filtered = requests.filter((r) => (filter === 'All' || r.status === filter) && `${r.reference} ${r.customer} ${r.origin} ${r.destination}`.toLowerCase().includes(query.toLowerCase())); return <section className="panel list-panel"><div className="panel-header"><div><h2>All requests</h2></div><div className="panel-header-actions"><button className="icon-create" aria-label="Upload Excel" title="Upload Excel" onClick={onImport}>↥</button><button className="icon-create" aria-label="New request" title="New request" onClick={onCreate}>＋</button></div></div><div className="filters"><div className="search">⌕ <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search reference or customer" /></div><div className="filter-group">{['All', 'Pending', 'Accepted', 'Rejected'].map((f) => <button key={f} className={filter === f ? 'filter active' : 'filter'} onClick={() => setFilter(f)}>{f}</button>)}</div></div>{filtered.map((r) => <div key={r.id}><RequestCard request={r} onClick={() => onOpen(r)} /></div>)}</section> }
-function RequestDetail({ request, role, onBack, onAccept, onReject, onReminder, onEdit }: { request: Request; role: Role; onBack: () => void; onAccept: (r: Request) => void; onReject: (r: Request) => void; onReminder: () => void; onEdit: () => void }) { return <section className="detail"><button className="back" onClick={onBack}>← Back to requests</button><div className="detail-heading"><div><p className="eyebrow">Trip request</p><h1>{request.reference}</h1><p className="subheading">{request.customer} · Created {request.createdAt}</p></div><div className="detail-heading-right"><button className="quick-action-icon" aria-label="Edit request" title="Edit request" onClick={onEdit}>✎</button><Status>{request.status}</Status></div></div><div className="detail-grid"><div className="panel"><h2>Journey details</h2><div className="journey journey-times"><div><small>Pickup</small><b>{request.origin}</b><span><em>Requested</em><b>{request.date}</b><b>{to12Hour(request.time)}</b></span></div><i>→</i><div><small>Drop-off</small><b>{request.destination}</b><span><em>Requested delivery</em><b>{request.requestedDeliveryDate || request.date}</b><b>{to12Hour(request.requestedDeliveryTime || request.time)}</b></span></div></div><div className="info-grid"><Info label="Customer" value={request.customer} /><Info label="No. of bags" value={request.noOfBags || `${request.passengers} bags`} /><Info label="Requested delivery" value={`${request.requestedDeliveryDate || request.date} · ${to12Hour(request.requestedDeliveryTime || request.time)}`} /><Info label="Reference" value={request.reference} /><Info label="Material" value={request.cargoMaterial || 'Cement'} /><Info label="Cargo weight" value={request.cargoWeight || '—'} /><Info label="Cargo type" value={request.cargoType || 'Bagged'} /></div>{role === 'Coordinator' && request.status !== 'Accepted' && <button className="button secondary wide" onClick={onReminder}>Send reminder to Operations</button>}</div>{request.driver && <div className="panel action-panel"><h2>Assigned driver</h2><div className="assigned"><b>{request.driver}</b><span>{request.driverNumber}</span></div></div>}{role === 'Operations' && request.status === 'Pending' && <div className="panel action-panel"><h2>Review</h2><button className="button primary wide" onClick={() => onAccept(request)}>Accept request</button><button className="button danger wide" onClick={() => onReject(request)}>Reject request</button></div>}</div></section> }
+
+function NavItem({ label, icon, count, active, onClick }: { label: string; icon: React.ReactNode; count?: number; active?: boolean; onClick: () => void }) {
+  return <button className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}><span style={{ display: 'inline-flex', alignItems: 'center' }}>{icon}</span>{label}{count ? <em>{count}</em> : null}</button>
+}
+
+function Status({ children }: { children: string }) {
+  return <span className={`status ${children.toLowerCase().replace(' ', '-')}`}>{children}</span>
+}
+
+function Dashboard({ pending, accepted, requests, trips, onOpen, onOpenTrip, onViewAll, onViewAllRequests }: { pending: Request[]; accepted: Request[]; requests: Request[]; trips: Trip[]; onOpen: (r: Request) => void; onOpenTrip: (t: Trip) => void; onViewAll: () => void; onViewAllRequests: () => void }) {
+  const recentTrips = [...trips].sort((a, b) => b.date.localeCompare(a.date));
+  const recentRequests = [...requests].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 1);
+  return (
+    <>
+      <section className="stats">
+        <Stat label="Pending requests" value={pending.length} tone="blue" hint="Needs review" icon={<Clock size={18} />} />
+        <Stat label="Trips this week" value={accepted.length + 2} tone="green" hint="Across all drivers" icon={<Truck size={18} />} />
+        <Stat label="Active trips" value={trips.filter((t) => t.tripStatus === 'In progress').length} tone="purple" hint="Currently moving" icon={<ClipboardText size={18} />} />
+      </section>
+      <section className="section-grid">
+        <div className="panel">
+          <div className="panel-header">
+            <div><h2>Trip requests</h2><p>Requests awaiting review or action.</p></div>
+            <button className="text-button" onClick={onViewAllRequests}>View all <ArrowRight size={14} style={{ display: 'inline', marginLeft: 2 }} /></button>
+          </div>
+          <div className="request-stack">{recentRequests.map((request) => <RequestCard key={request.id} request={request} onClick={() => onOpen(request)} />)}</div>
+          {!recentRequests.length && <Empty label="No trip requests yet" />}
+        </div>
+        <div className="panel">
+          <div className="panel-header">
+            <div><h2>Trips</h2><p>Recently created and scheduled journeys.</p></div>
+            <button className="text-button" onClick={onViewAll}>View all <ArrowRight size={14} style={{ display: 'inline', marginLeft: 2 }} /></button>
+          </div>
+          <div className="request-stack">{recentTrips.map((trip) => <TripRow key={trip.id} trip={trip} onClick={() => onOpenTrip(trip)} />)}</div>
+          {!recentTrips.length && <Empty label="No trips yet" />}
+        </div>
+      </section>
+    </>
+  )
+}
+
+function Stat({ label, value, hint, tone, icon }: { label: string; value: string | number; hint: string; tone: string; icon?: React.ReactNode }) {
+  return (
+    <div className="stat">
+      {icon && <span className={`stat-icon ${tone}`}>{icon}</span>}
+      <div>
+        <p>{label}</p>
+        <strong>{value}</strong>
+        <small>{hint}</small>
+      </div>
+    </div>
+  )
+}
+
+function TripRow({ trip, onClick }: { trip: Trip; onClick: () => void }) {
+  return (
+    <button className="trip-card" onClick={onClick}>
+      <span className="trip-date"><b>{trip.date.split(' ')[0]}</b><small>{trip.date.split(' ')[1]}</small></span>
+      <span className="request-main"><b>{trip.reference} · {trip.customer}</b><small>{trip.origin} <ArrowRight size={12} style={{ display: 'inline', margin: '0 2px', color: '#a4adba' }} /> {trip.destination}</small></span>
+      <Status>{trip.tripStatus}</Status>
+      <span className="chevron"><CaretRight size={16} /></span>
+    </button>
+  )
+}
+
+function RequestRow({ request, onClick }: { request: Request; onClick: () => void }) {
+  return (
+    <button className="request-row" onClick={onClick}>
+      <span className="request-icon"><ArrowRight size={16} /></span>
+      <span className="request-main"><b>{request.reference}</b><small>{request.origin} <ArrowRight size={12} style={{ display: 'inline', margin: '0 2px', color: '#a4adba' }} /> {request.destination}</small></span>
+      <span className="request-date"><b>{request.date}</b><small>{request.time} · {request.passengers} passengers</small></span>
+      <Status>{request.status}</Status>
+      <span className="chevron"><CaretRight size={16} /></span>
+    </button>
+  )
+}
+
+function RequestCard({ request, onClick }: { request: Request; onClick: () => void }) {
+  return (
+    <button className="request-card" onClick={onClick}>
+      <span className="request-icon"><ArrowRight size={16} /></span>
+      <span className="request-main"><b>{request.reference} · {request.customer}</b><small>{request.origin} <ArrowRight size={12} style={{ display: 'inline', margin: '0 2px', color: '#a4adba' }} /> {request.destination}</small><small>{request.date} · {request.time} · {request.passengers} bags</small></span>
+      <Status>{request.status}</Status>
+      <span className="chevron"><CaretRight size={16} /></span>
+    </button>
+  )
+}
+
+function RequestList({ requests, onOpen, onCreate, onImport }: { requests: Request[]; onOpen: (r: Request) => void; onCreate: () => void; onImport: () => void }) {
+  const [filter, setFilter] = useState('All');
+  const [query, setQuery] = useState('');
+  const filtered = requests.filter((r) => (filter === 'All' || r.status === filter) && `${r.reference} ${r.customer} ${r.origin} ${r.destination}`.toLowerCase().includes(query.toLowerCase()));
+  return (
+    <section className="panel list-panel">
+      <div className="panel-header">
+        <div><h2>All requests</h2></div>
+        <div className="panel-header-actions">
+          <button className="icon-create" aria-label="Upload Excel" title="Upload Excel" onClick={onImport}><UploadSimple size={16} /></button>
+          <button className="icon-create" aria-label="New request" title="New request" onClick={onCreate}><Plus size={16} /></button>
+        </div>
+      </div>
+      <div className="filters">
+        <div className="search"><MagnifyingGlass size={16} style={{ color: '#9ca6b4', marginRight: 4 }} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search reference or customer" /></div>
+        <div className="filter-group">{['All', 'Pending', 'Accepted', 'Rejected'].map((f) => <button key={f} className={filter === f ? 'filter active' : 'filter'} onClick={() => setFilter(f)}>{f}</button>)}</div>
+      </div>
+      {filtered.map((r) => <div key={r.id}><RequestCard request={r} onClick={() => onOpen(r)} /></div>)}
+    </section>
+  )
+}
+
+function RequestDetail({ request, role, onBack, onAccept, onReject, onReminder, onEdit }: { request: Request; role: Role; onBack: () => void; onAccept: (r: Request) => void; onReject: (r: Request) => void; onReminder: () => void; onEdit: () => void }) {
+  return (
+    <section className="detail">
+      <button className="back" onClick={onBack}><ArrowLeft size={16} style={{ display: 'inline', marginRight: 4 }} /> Back to requests</button>
+      <div className="detail-heading">
+        <div><p className="eyebrow">Trip request</p><h1>{request.reference}</h1><p className="subheading">{request.customer} · Created {request.createdAt}</p></div>
+        <div className="detail-heading-right"><button className="quick-action-icon" aria-label="Edit request" title="Edit request" onClick={onEdit}><PencilSimple size={16} /></button><Status>{request.status}</Status></div>
+      </div>
+      <div className="detail-grid">
+        <div className="panel">
+          <h2>Journey details</h2>
+          <div className="journey journey-times">
+            <div><small>Pickup</small><b>{request.origin}</b><span><em>Requested</em><b>{request.date}</b><b>{to12Hour(request.time)}</b></span></div>
+            <ArrowRight size={18} style={{ color: 'var(--blue)', marginTop: 20 }} />
+            <div><small>Drop-off</small><b>{request.destination}</b><span><em>Requested delivery</em><b>{request.requestedDeliveryDate || request.date}</b><b>{to12Hour(request.requestedDeliveryTime || request.time)}</b></span></div>
+          </div>
+          <div className="info-grid">
+            <Info label="Customer" value={request.customer} />
+            <Info label="No. of bags" value={request.noOfBags || `${request.passengers} bags`} />
+            <Info label="Requested delivery" value={`${request.requestedDeliveryDate || request.date} · ${to12Hour(request.requestedDeliveryTime || request.time)}`} />
+            <Info label="Reference" value={request.reference} />
+            <Info label="Material" value={request.cargoMaterial || 'Cement'} />
+            <Info label="Cargo weight" value={request.cargoWeight || '—'} />
+            <Info label="Cargo type" value={request.cargoType || 'Bagged'} />
+          </div>
+          {role === 'Coordinator' && request.status !== 'Accepted' && <button className="button secondary wide" onClick={onReminder}>Send reminder to Operations</button>}
+        </div>
+        {request.driver && <div className="panel action-panel"><h2>Assigned driver</h2><div className="assigned"><b>{request.driver}</b><span>{request.driverNumber}</span></div></div>}
+        {role === 'Operations' && request.status === 'Pending' && <div className="panel action-panel"><h2>Review</h2><button className="button primary wide" onClick={() => onAccept(request)}>Accept request</button><button className="button danger wide" onClick={() => onReject(request)}>Reject request</button></div>}
+      </div>
+    </section>
+  )
+}
+
 function to12Hour(time: string) { const [hours, minutes] = time.split(':').map(Number); if (Number.isNaN(hours) || Number.isNaN(minutes)) return time; const suffix = hours >= 12 ? 'PM' : 'AM'; const hour = hours % 12 || 12; return `${hour}:${String(minutes).padStart(2, '0')} ${suffix}` }
 function Info({ label, value }: { label: string; value: string }) { return <div><small>{label}</small><b>{value}</b></div> }
 function TripList({ trips, onOpen }: { trips: Trip[]; onOpen: (t: Trip) => void }) { return <section className="panel list-panel"><div className="panel-header"><div><h2>{trips.length} trips</h2></div></div>{trips.map((t) => <div key={t.id}><TripRow trip={t} onClick={() => onOpen(t)} /></div>)}{!trips.length && <Empty label="No trips assigned to you" />}</section> }
-function TripDetail({ trip, role, onBack, onExtra, onDocument, onEdit }: { trip: Trip; role: Role; onBack: () => void; onExtra: () => void; onDocument: () => void; onEdit: () => void }) { return <section className="detail"><button className="back" onClick={onBack}>← Back to trips</button><div className="detail-heading"><div><p className="eyebrow">Trip details</p><h1>{trip.reference}</h1><p className="subheading">{trip.customer} · Created {trip.createdAt}</p></div><div className="detail-heading-right">{(role === 'Coordinator' || role === 'Operations') && <button className="quick-action-icon" aria-label="Edit trip" title="Edit trip" onClick={onEdit}>✎</button>}{role === 'Driver' && <div className="detail-quick-actions"><button className="quick-action-icon" aria-label="Upload trip document" title="Upload trip document" onClick={onDocument}>↥</button><button className="quick-action-icon" aria-label="Submit extra request" title="Submit extra request" onClick={onExtra}>＋</button></div>}<Status>{trip.tripStatus}</Status></div></div><div className="detail-grid"><div className="panel"><h2>Journey</h2><div className="journey journey-times"><div><small>Pickup</small><b>{trip.origin}</b><span><em>Scheduled</em><b>{trip.pickupDate}</b><b>{to12Hour(trip.pickupTime)}</b></span><span><em>Actual</em><b>{trip.pickupDate}</b><b>{to12Hour(trip.pickupTime)}</b></span></div><i>→</i><div><small>Drop-off</small><b>{trip.destination}</b><span><em>Requested</em><b>{trip.date}</b><b>{to12Hour(trip.time)}</b></span><span><em>Estimated</em><b>{trip.estimatedDropDate}</b><b>{to12Hour(trip.estimatedDropTime)}</b></span><span><em>Actual</em>{trip.actualDropDate ? <><b>{trip.actualDropDate}</b><b>{to12Hour(trip.actualDropTime || '')}</b></> : <b>Awaiting delivery</b>}</span></div></div><InfoSection title="Cargo details"><Info label="Material" value={trip.cargo.material} /><Info label="Cement company" value={trip.cargo.company} /><Info label="Cargo weight" value={trip.cargo.quantity} /><Info label="Cargo type" value={trip.cargo.loadType} />{trip.cargo.loadType === 'Bagged' && <Info label="No. of bags" value={trip.cargo.noOfBags || '—'} />}</InfoSection><InfoSection title="Truck details"><Info label="Truck number" value={trip.truck.number} /><Info label="Truck type" value={trip.truck.type} /><Info label="Configuration" value={trip.truck.configuration} /><Info label="Truck brand" value={trip.truck.brand} /></InfoSection><InfoSection title="Driver details"><Info label="Driver name" value={trip.driver || 'Unassigned'} /><Info label="Phone number" value={trip.driverNumber || 'Not available'} /></InfoSection><InfoSection title="Fuel details"><Info label="Assigned fuel" value={trip.fuel.assigned} /><Info label="Received fuel" value={trip.fuel.received} /><Info label="Station name" value={trip.fuel.station} /><Info label="Fulfilled at" value={trip.fuel.fulfilledAt} /></InfoSection><InfoSection title="Cash details"><Info label="Advanced amount" value={trip.cash.advance} /><Info label="Payment mode" value={trip.cash.paymentMode} /></InfoSection><h2 className="activity-title section-title">Extra expense</h2>{trip.extras.map((extra) => <div className="extra-row" key={extra.id}><span className="extra-icon">{extra.type === 'Fuel' ? '◉' : extra.type === 'Cash' ? '₹' : '◆'}</span><div><b>Extra {extra.type} request</b><p>{extra.note}</p></div><strong>{extra.amount}</strong></div>)}{!trip.extras.length && <Empty label="No extra expenses" />}<h2 className="activity-title">Trip documents</h2>{trip.documents.map((doc) => <div className="extra-row" key={doc.id}><span className="extra-icon">▤</span><div><b>{doc.name}</b><p>{doc.type} · {doc.uploadedAt}</p></div><Status>Approved</Status></div>)}{!trip.documents.length && <Empty label="No documents uploaded" />}</div><div className="panel action-panel"><h2>Driver actions</h2><p>Submit an expense or operational request linked to this trip.</p>{role === 'Driver' && <><button className="button primary wide" onClick={onDocument}>↥ Upload trip document</button><button className="button primary wide" onClick={onExtra}>＋ Extra request</button></>}</div></div></section> }
+
+function TripDetail({ trip, role, onBack, onExtra, onDocument, onEdit }: { trip: Trip; role: Role; onBack: () => void; onExtra: () => void; onDocument: () => void; onEdit: () => void }) {
+  return (
+    <section className="detail">
+      <button className="back" onClick={onBack}><ArrowLeft size={16} style={{ display: 'inline', marginRight: 4 }} /> Back to trips</button>
+      <div className="detail-heading">
+        <div><p className="eyebrow">Trip details</p><h1>{trip.reference}</h1><p className="subheading">{trip.customer} · Created {trip.createdAt}</p></div>
+        <div className="detail-heading-right">
+          {(role === 'Coordinator' || role === 'Operations') && <button className="quick-action-icon" aria-label="Edit trip" title="Edit trip" onClick={onEdit}><PencilSimple size={16} /></button>}
+          {role === 'Driver' && <div className="detail-quick-actions"><button className="quick-action-icon" aria-label="Upload trip document" title="Upload trip document" onClick={onDocument}><UploadSimple size={16} /></button><button className="quick-action-icon" aria-label="Submit extra request" title="Submit extra request" onClick={onExtra}><Plus size={16} /></button></div>}
+          <Status>{trip.tripStatus}</Status>
+        </div>
+      </div>
+      <div className="detail-grid">
+        <div className="panel">
+          <h2>Journey</h2>
+          <div className="journey journey-times">
+            <div><small>Pickup</small><b>{trip.origin}</b><span><em>Scheduled</em><b>{trip.pickupDate}</b><b>{to12Hour(trip.pickupTime)}</b></span><span><em>Actual</em><b>{trip.pickupDate}</b><b>{to12Hour(trip.pickupTime)}</b></span></div>
+            <ArrowRight size={18} style={{ color: 'var(--blue)', marginTop: 20 }} />
+            <div><small>Drop-off</small><b>{trip.destination}</b><span><em>Requested</em><b>{trip.date}</b><b>{to12Hour(trip.time)}</b></span><span><em>Estimated</em><b>{trip.estimatedDropDate}</b><b>{to12Hour(trip.estimatedDropTime)}</b></span><span><em>Actual</em>{trip.actualDropDate ? <><b>{trip.actualDropDate}</b><b>{to12Hour(trip.actualDropTime || '')}</b></> : <b>Awaiting delivery</b>}</span></div>
+          </div>
+          <InfoSection title="Cargo details"><Info label="Material" value={trip.cargo.material} /><Info label="Cement company" value={trip.cargo.company} /><Info label="Cargo weight" value={trip.cargo.quantity} /><Info label="Cargo type" value={trip.cargo.loadType} />{trip.cargo.loadType === 'Bagged' && <Info label="No. of bags" value={trip.cargo.noOfBags || '—'} />}</InfoSection>
+          <InfoSection title="Truck details"><Info label="Truck number" value={trip.truck.number} /><Info label="Truck type" value={trip.truck.type} /><Info label="Configuration" value={trip.truck.configuration} /><Info label="Truck brand" value={trip.truck.brand} /></InfoSection>
+          <InfoSection title="Driver details"><Info label="Driver name" value={trip.driver || 'Unassigned'} /><Info label="Phone number" value={trip.driverNumber || 'Not available'} /></InfoSection>
+          <InfoSection title="Fuel details"><Info label="Assigned fuel" value={trip.fuel.assigned} /><Info label="Received fuel" value={trip.fuel.received} /><Info label="Station name" value={trip.fuel.station} /><Info label="Fulfilled at" value={trip.fuel.fulfilledAt} /></InfoSection>
+          <InfoSection title="Cash details"><Info label="Advanced amount" value={trip.cash.advance} /><Info label="Payment mode" value={trip.cash.paymentMode} /></InfoSection>
+          <h2 className="activity-title section-title">Extra expense</h2>
+          {trip.extras.map((extra) => <div className="extra-row" key={extra.id}><span className="extra-icon">{extra.type === 'Fuel' ? <GasPump size={16} /> : extra.type === 'Cash' ? <CurrencyInr size={16} /> : <Drop size={16} />}</span><div><b>Extra {extra.type} request</b><p>{extra.note}</p></div><strong>{extra.amount}</strong></div>)}
+          {!trip.extras.length && <Empty label="No extra expenses" />}
+          <h2 className="activity-title">Trip documents</h2>
+          {trip.documents.map((doc) => <div className="extra-row" key={doc.id}><span className="extra-icon"><FileText size={16} /></span><div><b>{doc.name}</b><p>{doc.type} · {doc.uploadedAt}</p></div><Status>Approved</Status></div>)}
+          {!trip.documents.length && <Empty label="No documents uploaded" />}
+        </div>
+        <div className="panel action-panel">
+          <h2>Driver actions</h2>
+          <p>Submit an expense or operational request linked to this trip.</p>
+          {role === 'Driver' && <><button className="button primary wide" onClick={onDocument}><UploadSimple size={16} style={{ display: 'inline', marginRight: 6 }} /> Upload trip document</button><button className="button primary wide" onClick={onExtra}><Plus size={16} style={{ display: 'inline', marginRight: 6 }} /> Extra request</button></>}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function InfoSection({ title, children }: { title: string; children: React.ReactNode }) { return <><h2 className="activity-title section-title">{title}</h2><div className="info-grid compact-grid">{children}</div></> }
 function DriverDetails({ trip }: { trip: Trip }) { return <section className="panel driver-details-panel"><InfoSection title="Driver details"><Info label="Driver name" value={trip.driver || 'Unassigned'} /><Info label="Phone number" value={trip.driverNumber || 'Not available'} /></InfoSection></section> }
 function Empty({ label }: { label: string }) { return <div className="empty">{label}</div> }
-function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) { return <div className="modal-backdrop"><div className="modal"><div className="modal-header"><h2>{title}</h2><button onClick={onClose} aria-label="Close">×</button></div>{children}</div></div> }
+function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) { return <div className="modal-backdrop"><div className="modal"><div className="modal-header"><h2>{title}</h2><button onClick={onClose} aria-label="Close"><X size={18} /></button></div>{children}</div></div> }
 function EditModal({ entity, onClose, onSave }: { entity: Request | Trip; onClose: () => void; onSave: (data: Partial<Request>) => void }) { const [reference, setReference] = useState(entity.reference); const [customer, setCustomer] = useState(entity.customer); const [origin, setOrigin] = useState(entity.origin); const [destination, setDestination] = useState(entity.destination); const [date, setDate] = useState(entity.date); const [time, setTime] = useState(entity.time); const [deliveryDate, setDeliveryDate] = useState(entity.requestedDeliveryDate || entity.date); const [deliveryTime, setDeliveryTime] = useState(entity.requestedDeliveryTime || entity.time); const [cargoMaterial, setCargoMaterial] = useState(entity.cargoMaterial || 'Cement'); const [cargoCompany, setCargoCompany] = useState(entity.cargoCompany || entity.customer); const [cargoWeight, setCargoWeight] = useState(entity.cargoWeight || ''); const [cargoType, setCargoType] = useState<Request['cargoType']>(entity.cargoType || 'Bagged'); const [noOfBags, setNoOfBags] = useState(entity.noOfBags || ''); return <Modal title={`Edit ${'tripStatus' in entity ? 'trip' : 'request'}`} onClose={onClose}><form onSubmit={(e) => { e.preventDefault(); onSave({ reference, customer, origin, destination, date, time, requestedDeliveryDate: deliveryDate, requestedDeliveryTime: deliveryTime, cargoMaterial, cargoCompany, cargoWeight, cargoType, noOfBags, passengers: Number(noOfBags) || entity.passengers }) }}><label>Reference<input value={reference} onChange={(e) => setReference(e.target.value)} /></label><label>Customer<input value={customer} onChange={(e) => setCustomer(e.target.value)} /></label><div className="form-row"><label>Pickup<input value={origin} onChange={(e) => setOrigin(e.target.value)} /></label><label>Drop-off<input value={destination} onChange={(e) => setDestination(e.target.value)} /></label></div><div className="form-row"><label>Requested date<input value={date} onChange={(e) => setDate(e.target.value)} /></label><label>Requested time<input value={time} onChange={(e) => setTime(e.target.value)} /></label></div><div className="form-row"><label>Delivery date<input value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} /></label><label>Delivery time<input value={deliveryTime} onChange={(e) => setDeliveryTime(e.target.value)} /></label></div><label>Material<input value={cargoMaterial} onChange={(e) => setCargoMaterial(e.target.value)} /></label><div className="form-row"><label>Cargo weight<input value={cargoWeight} onChange={(e) => setCargoWeight(e.target.value)} placeholder="28 tonnes" /></label><label>Cargo type<select value={cargoType} onChange={(e) => setCargoType(e.target.value as Request['cargoType'])}><option value="Bagged">Bagged</option><option value="Loose">Loose</option></select></label></div><label>No. of bags<input value={noOfBags} onChange={(e) => setNoOfBags(e.target.value)} placeholder="560 bags" /></label><button className="button primary wide" type="submit">Save changes</button></form></Modal> }
 function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (r: Request) => void }) { const [reference, setReference] = useState(''); const [customer, setCustomer] = useState(''); const [origin, setOrigin] = useState(''); const [destination, setDestination] = useState(''); const [date, setDate] = useState(''); const [time, setTime] = useState(''); const [deliveryDate, setDeliveryDate] = useState(''); const [deliveryTime, setDeliveryTime] = useState(''); const [cargoMaterial, setCargoMaterial] = useState('Cement'); const [cargoCompany, setCargoCompany] = useState(''); const [cargoWeight, setCargoWeight] = useState(''); const [cargoType, setCargoType] = useState<Request['cargoType']>('Bagged'); const [noOfBags, setNoOfBags] = useState(''); const submit = (e: React.FormEvent) => { e.preventDefault(); onCreate({ id: `req-${Date.now()}`, reference: reference || `DR-${1050 + Math.floor(Math.random() * 20)}`, customer: customer || 'New customer', origin: origin || 'Wadgaon, Pune', destination: destination || 'Nashik MIDC', date: date || '20 Aug 2026', time: time || '09:00', requestedDeliveryDate: deliveryDate || date || '20 Aug 2026', requestedDeliveryTime: deliveryTime || time || '09:00', cargoMaterial, cargoCompany: cargoCompany || customer, cargoWeight, cargoType, noOfBags: noOfBags || '1 bag', createdAt: (() => { const now = new Date(); const day = now.getDate(); const month = now.toLocaleString('en-GB', { month: 'short' }); const year = now.getFullYear(); const hours = now.getHours(); const minutes = String(now.getMinutes()).padStart(2, '0'); const suffix = hours >= 12 ? 'PM' : 'AM'; const hour12 = hours % 12 || 12; return `${day} ${month} ${year} · ${hour12}:${minutes} ${suffix}`; })(), passengers: Number(noOfBags) || 1, status: 'Pending' }) }; return <Modal title="Create trip request" onClose={onClose}><form onSubmit={submit}><label>Reference<input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="DR-1049" /></label><label>Customer<input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Company or person" /></label><div className="form-row"><label>Pickup<input value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="City or address" /></label><label>Drop-off<input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="City or address" /></label></div><div className="form-row"><label>Requested date<input value={date} onChange={(e) => setDate(e.target.value)} placeholder="19 Aug 2026" /></label><label>Requested time<input value={time} onChange={(e) => setTime(e.target.value)} placeholder="10:00 AM" /></label></div><div className="form-row"><label>Delivery date<input value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} placeholder="19 Aug 2026" /></label><label>Delivery time<input value={deliveryTime} onChange={(e) => setDeliveryTime(e.target.value)} placeholder="10:00 AM" /></label></div><div className="form-row"><label>Cargo weight<input value={cargoWeight} onChange={(e) => setCargoWeight(e.target.value)} placeholder="28 tonnes" /></label><label>Cargo type<select value={cargoType} onChange={(e) => setCargoType(e.target.value as Request['cargoType'])}><option value="Bagged">Bagged</option><option value="Loose">Loose</option></select></label></div><label>No. of bags<input value={noOfBags} onChange={(e) => setNoOfBags(e.target.value)} placeholder="560 bags" /></label><button className="button primary wide" type="submit">Create request</button></form></Modal> }
-function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) { return <Modal title="Import requests" onClose={onClose}><div className="upload"><span>↥</span><b>Drop your Excel file here</b><p>or choose a .xlsx file from your device</p><button className="button secondary">Choose file</button></div><div className="import-preview"><b>Preview ready</b><span>2 valid requests · 0 errors</span></div><button className="button primary wide" onClick={onDone}>Validate and import</button></Modal> }
+function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) { return <Modal title="Import requests" onClose={onClose}><div className="upload"><UploadSimple size={24} style={{ color: 'var(--blue)' }} /><b>Drop your Excel file here</b><p>or choose a .xlsx file from your device</p><button className="button secondary">Choose file</button></div><div className="import-preview"><b>Preview ready</b><span>2 valid requests · 0 errors</span></div><button className="button primary wide" onClick={onDone}>Validate and import</button></Modal> }
 function ExtraModal({ onClose, onCreate }: { onClose: () => void; onCreate: (x: Extra) => void }) { const [type, setType] = useState<Extra['type']>('Fuel'); const [amount, setAmount] = useState(''); const [note, setNote] = useState(''); return <Modal title="Submit extra request" onClose={onClose}><form onSubmit={(e) => { e.preventDefault(); onCreate({ id: `ex-${Date.now()}`, type, amount: amount.trim() ? `₹${amount.trim()}` : '₹0', note: note.trim() || 'Submitted by driver for review', status: 'Submitted' }) }}><label>Request type<select value={type} onChange={(e) => setType(e.target.value as Extra['type'])}><option>Fuel</option><option>Cash</option><option>AdBlue</option></select></label><label>Amount<input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder="5000" /></label><label>Note<textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a short note" rows={3} /></label><button className="button primary wide" type="submit">Submit request</button></form></Modal> }
-function DocumentModal({ onClose, onCreate }: { onClose: () => void; onCreate: (x: TripDocument) => void }) { const [type, setType] = useState<TripDocument['type']>('LR'); const [name, setName] = useState(''); return <Modal title="Upload trip document" onClose={onClose}><form onSubmit={(e) => { e.preventDefault(); onCreate({ id: `doc-${Date.now()}`, name: name || `Trip-document-${type}.pdf`, type, uploadedAt: 'Just now' }) }}><div className="upload"><span>↥</span><b>Select a document</b><p>PDF, JPG, or PNG up to 10 MB</p><input type="file" onChange={(e) => setName(e.target.files?.[0]?.name || '')} /></div><label>Document type<select value={type} onChange={(e) => setType(e.target.value as TripDocument['type'])}><option>LR</option><option>WB</option><option>Invoice</option><option>Other</option></select></label><button className="button primary wide" type="submit">Upload document</button></form></Modal> }
+function DocumentModal({ onClose, onCreate }: { onClose: () => void; onCreate: (x: TripDocument) => void }) { const [type, setType] = useState<TripDocument['type']>('LR'); const [name, setName] = useState(''); return <Modal title="Upload trip document" onClose={onClose}><form onSubmit={(e) => { e.preventDefault(); onCreate({ id: `doc-${Date.now()}`, name: name || `Trip-document-${type}.pdf`, type, uploadedAt: 'Just now' }) }}><div className="upload"><UploadSimple size={24} style={{ color: 'var(--blue)' }} /><b>Select a document</b><p>PDF, JPG, or PNG up to 10 MB</p><input type="file" onChange={(e) => setName(e.target.files?.[0]?.name || '')} /></div><label>Document type<select value={type} onChange={(e) => setType(e.target.value as TripDocument['type'])}><option>LR</option><option>WB</option><option>Invoice</option><option>Other</option></select></label><button className="button primary wide" type="submit">Upload document</button></form></Modal> }
 
 function TripOpsReport({ trips }: { trips: Trip[] }) {
   const [statusFilter, setStatusFilter] = useState('All')
@@ -212,11 +520,11 @@ function TripOpsReport({ trips }: { trips: Trip[] }) {
         <div className="panel-header" style={{ alignItems: 'center' }}>
           <div><h2>All Trips</h2><p>Live data from trips</p></div>
           <button className="icon-create" onClick={handleDownloadExcel} title="Download Excel (.xlsx)" aria-label="Download Excel">
-            ⤓
+            <DownloadSimple size={18} />
           </button>
         </div>
         <div className="filters" style={{ flexWrap: 'wrap' }}>
-          <div className="search">⌕ <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search trip ID, source, destination, driver..." /></div>
+          <div className="search"><MagnifyingGlass size={16} style={{ color: '#9ca6b4', marginRight: 4 }} /><input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search trip ID, source, destination, driver..." /></div>
           <div className="filter-group">{['All', 'Scheduled', 'In progress', 'Completed'].map(s => <button key={s} className={statusFilter === s ? 'filter active' : 'filter'} onClick={() => setStatusFilter(s)}>{s}</button>)}</div>
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -282,6 +590,24 @@ function FuelExpenseReport({ trips }: { trips: Trip[] }) {
       r.truck.toLowerCase().includes(q);
   })
 
+  const handleDownloadExcel = async () => {
+    const XLSX = await import('xlsx');
+    const data = filteredRows.map(r => ({
+      'Trip': r.trip,
+      'Driver': r.driver,
+      'Truck': r.truck,
+      'Fuel Authorized': r.fuelAuth,
+      'Fuel Recorded': r.fuelRec,
+      'Cash Advance': r.cash,
+      'Extra Fuel': r.extraFuel ? 'Yes' : 'No'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Fuel & Expenses');
+    XLSX.writeFile(workbook, `Fuel_Expense_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
   const totalAuth = dummyRows.reduce((s, r) => s + r.authN, 0)
   const totalRec  = dummyRows.reduce((s, r) => s + r.recN,  0)
   const extraCount = dummyRows.filter(r => r.extraFuel).length
@@ -289,18 +615,43 @@ function FuelExpenseReport({ trips }: { trips: Trip[] }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <section className="stats">
-        <div className="stat"><span className="stat-icon blue">◉</span><div><p>Fuel Authorized</p><strong>{totalAuth} L</strong><small>Across all trips</small></div></div>
-        <div className="stat"><span className="stat-icon green">✓</span><div><p>Fuel Recorded</p><strong>{totalRec} L</strong><small>Actual consumption</small></div></div>
-        <div className="stat"><span className="stat-icon purple">₹</span><div><p>Cash Advances</p><strong>₹6,000</strong><small>{dummyRows.length} trips</small></div></div>
-        <div className="stat"><span className="stat-icon blue">◷</span><div><p>Fuel Transactions</p><strong>{dummyRows.length}</strong><small>This period</small></div></div>
-        <div className="stat"><span style={{ background: '#fef3c7', color: '#d97706', width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.125rem', fontWeight: 700, flexShrink: 0 }}>!</span><div><p>Extra Fuel Requests</p><strong>{extraCount}</strong><small>Pending review</small></div></div>
+      <section className="stats" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
+          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Fuel Authorized</p>
+          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{totalAuth} L</strong>
+          <small style={{ color: '#8993a2', fontSize: '10px' }}>Across all trips</small>
+        </div>
+        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
+          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Fuel Recorded</p>
+          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{totalRec} L</strong>
+          <small style={{ color: '#8993a2', fontSize: '10px' }}>Actual consumption</small>
+        </div>
+        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
+          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Cash Advances</p>
+          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>₹6,000</strong>
+          <small style={{ color: '#8993a2', fontSize: '10px' }}>{dummyRows.length} trips</small>
+        </div>
+        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
+          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Fuel Transactions</p>
+          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{dummyRows.length}</strong>
+          <small style={{ color: '#8993a2', fontSize: '10px' }}>This period</small>
+        </div>
+        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
+          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Extra Fuel Requests</p>
+          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{extraCount}</strong>
+          <small style={{ color: '#8993a2', fontSize: '10px' }}>Pending review</small>
+        </div>
       </section>
 
       <div className="panel">
-        <div className="panel-header"><div><h2>Fuel & Expense Breakdown</h2><p>Per-trip fuel and cash advance summary</p></div></div>
+        <div className="panel-header" style={{ alignItems: 'center' }}>
+          <div><h2>Fuel & Expense Breakdown</h2><p>Per-trip fuel and cash advance summary</p></div>
+          <button className="icon-create" onClick={handleDownloadExcel} title="Download Excel (.xlsx)" aria-label="Download Excel">
+            <DownloadSimple size={18} />
+          </button>
+        </div>
         <div className="filters" style={{ flexWrap: 'wrap' }}>
-          <div className="search">⌕ <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search trip ID, driver, truck..." /></div>
+          <div className="search"><MagnifyingGlass size={16} style={{ color: '#9ca6b4', marginRight: 4 }} /><input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search trip ID, driver, truck..." /></div>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
@@ -353,4 +704,3 @@ function FuelExpenseReport({ trips }: { trips: Trip[] }) {
     </div>
   )
 }
-
