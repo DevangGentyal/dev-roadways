@@ -1,0 +1,26 @@
+[
+  {
+    "id": "fu-101",
+    "tripId": "req-1",
+    "tripRef": "DR-101",
+    "driver": "Ramesh Yadav",
+    "driverPhone": "DRV-021",
+    "note": "Verify unloading completion at Koregaon Village warehouse.",
+    "dueDate": "19 Aug 2026",
+    "dueTime": "13:00",
+    "createdAt": "18 Aug 2026 · 10:00 AM",
+    "status": "Open"
+  },
+  {
+    "id": "fu-102",
+    "tripId": "req-4",
+    "tripRef": "DR-104",
+    "driver": "Suresh Kumar",
+    "driverPhone": "DRV-022",
+    "note": "Check dispatcher status for Pandharpur route fuel authorization confirmation.",
+    "dueDate": "17 Aug 2026",
+    "dueTime": "15:30",
+    "createdAt": "16 Aug 2026 · 02:00 PM",
+    "status": "Open"
+  }
+]

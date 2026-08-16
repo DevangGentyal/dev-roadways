@@ -42,29 +42,35 @@ type Truck = { number: string; type: 'Body' | 'Open'; configuration: '10 tyre' |
 type FuelDetails = { assigned: string; received: string; station: string; fulfilledAt: string }
 type CashDetails = { advance: string; paymentMode: 'Cash' | 'UPI' }
 type TripDocument = { id: string; name: string; type: 'LR' | 'WB' | 'Invoice' | 'Other'; uploadedAt: string }
+type Followup = { id: string; tripId: string; tripRef: string; driver: string; driverPhone: string; note: string; dueDate: string; dueTime: string; createdAt: string; status: 'Open' | 'Done' }
+type FuelTransaction = { id: string; tripId: string; tripRef: string; driver: string; station: string; amount: string; litres: string; status: 'Pending' | 'Sent' | 'Resent' }
 
-  const seedRequests: Request[] = [
+const seedRequests: Request[] = [
   { id: 'req-1048', reference: 'DR-1048', customer: 'Ultratech Cement', origin: 'Wadgaon, Pune', destination: 'Nashik MIDC', date: '18 Aug 2026', time: '08:30', createdAt: '16 Aug 2026 · 10:15 AM', passengers: 28, status: 'Pending' },
   { id: 'req-1047', reference: 'DR-1047', customer: 'Chettinad Cement', origin: 'Ariyalur Plant', destination: 'Coimbatore', date: '19 Aug 2026', time: '10:00', createdAt: '16 Aug 2026 · 11:40 AM', passengers: 30, status: 'Pending' },
   { id: 'req-1046', reference: 'DR-1046', customer: 'Dalmia Cement', origin: 'Rajgangpur Plant', destination: 'Bhubaneswar', date: '17 Aug 2026', time: '13:15', createdAt: '16 Aug 2026 · 09:20 AM', passengers: 28, status: 'Accepted', driver: 'Ramesh Yadav', driverNumber: 'DRV-021' },
   { id: 'req-1045', reference: 'DR-1045', customer: 'Shree Cement', origin: 'Beawar Plant', destination: 'Jaipur', date: '16 Aug 2026', time: '07:45', createdAt: '15 Aug 2026 · 04:05 PM', passengers: 26, status: 'Rejected' },
-  ]
-  const seedTrips: Trip[] = [{ ...seedRequests[2], tripStatus: 'In progress', pickupDate: '17 Aug 2026', pickupTime: '13:15', estimatedDropDate: '17 Aug 2026', estimatedDropTime: '18:30', cargo: { material: 'Cement', company: 'Dalmia Cement', quantity: '28 tonnes', noOfBags: '560 bags', loadType: 'Bagged' }, truck: { number: 'OD 14 AB 4721', type: 'Body', configuration: '12 tyre', brand: 'Tata Motors' }, fuel: { assigned: '120 L', received: '120 L', station: 'Indian Oil, Cuttack Bypass', fulfilledAt: '17 Aug 2026 · 13:35' }, cash: { advance: '₹25,000', paymentMode: 'UPI' }, documents: [{ id: 'doc-1', name: 'DR-1046-LR.pdf', type: 'LR', uploadedAt: '17 Aug 2026 · 13:35' }], extras: [{ id: 'ex-1', type: 'Fuel', amount: '₹8,400', note: 'Refuelled near Cuttack bypass', status: 'Submitted' }] }]
+]
+const seedTrips: Trip[] = [{ ...seedRequests[2], tripStatus: 'In progress', pickupDate: '17 Aug 2026', pickupTime: '13:15', estimatedDropDate: '17 Aug 2026', estimatedDropTime: '18:30', cargo: { material: 'Cement', company: 'Dalmia Cement', quantity: '28 tonnes', noOfBags: '560 bags', loadType: 'Bagged' }, truck: { number: 'OD 14 AB 4721', type: 'Body', configuration: '12 tyre', brand: 'Tata Motors' }, fuel: { assigned: '120 L', received: '120 L', station: 'Indian Oil, Cuttack Bypass', fulfilledAt: '17 Aug 2026 · 13:35' }, cash: { advance: '₹25,000', paymentMode: 'UPI' }, documents: [{ id: 'doc-1', name: 'DR-1046-LR.pdf', type: 'LR', uploadedAt: '17 Aug 2026 · 13:35' }], extras: [{ id: 'ex-1', type: 'Fuel', amount: '₹8,400', note: 'Refuelled near Cuttack bypass', status: 'Submitted' }] }]
 
 export default function OpsDashboard() {
   const [role, setRole] = useState<Role>('Coordinator')
   const [requests, setRequests] = useState<Request[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
+  const [followups, setFollowups] = useState<Followup[]>([])
+  const [fuelTransactions, setFuelTransactions] = useState<FuelTransaction[]>([])
   const [dbReady, setDbReady] = useState(false)
   const [dbError, setDbError] = useState('')
-  useEffect(() => { fetch('/api/mock-db').then((response) => { if (!response.ok) throw new Error('Mock database unavailable'); return response.json() }).then((data) => { setRequests(data.requests); setTrips(data.trips); setDbReady(true) }).catch(() => setDbError('Unable to load mock database')) }, [])
-  async function persist(collection: 'requests' | 'trips' | 'extras' | 'documents', data: unknown) { const response = await fetch('/api/mock-db', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ collection, data }) }); if (!response.ok) throw new Error('Mock database write failed'); return response.json() }
+  useEffect(() => { fetch('/api/mock-db').then((response) => { if (!response.ok) throw new Error('Mock database unavailable'); return response.json() }).then((data) => { setRequests(data.requests); setTrips(data.trips); setFollowups(data.followups || []); setFuelTransactions(data.fuelTransactions || []); setDbReady(true) }).catch(() => setDbError('Unable to load mock database')) }, [])
+  async function persist(collection: 'requests' | 'trips' | 'extras' | 'documents' | 'followups' | 'fuel-transactions', data: unknown) { const response = await fetch('/api/mock-db', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ collection, data }) }); if (!response.ok) throw new Error('Mock database write failed'); return response.json() }
   const [view, setView] = useState('dashboard')
   const [selected, setSelected] = useState<Request | Trip | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [showExtra, setShowExtra] = useState(false)
   const [showDocument, setShowDocument] = useState(false)
+  const [showFollowup, setShowFollowup] = useState(false)
+  const [followupTripFilter, setFollowupTripFilter] = useState('')
   const [editTarget, setEditTarget] = useState<Request | Trip | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [toast, setToast] = useState('')
@@ -85,10 +91,13 @@ export default function OpsDashboard() {
   function addRequest(data: Request) { const next = [data, ...requests]; setRequests(next); void persist('requests', next); setShowCreate(false); notify('Trip request created') }
   function sendReminder(request: Request) { notify(`Reminder sent to Operations for ${request.reference}`) }
   async function updateEntity(data: Partial<Request>) { if (!editTarget) return; const updated = { ...editTarget, ...data }; const nextRequests = requests.map((item) => item.id === updated.id ? { ...item, ...data } : item); const nextTrips = trips.map((item) => item.id === updated.id ? { ...item, ...data, pickupDate: data.date || item.pickupDate, pickupTime: data.time || item.pickupTime } : item); setRequests(nextRequests); setTrips(nextTrips); setSelected(updated); await persist('requests', nextRequests); if ('tripStatus' in updated) await persist('trips', nextTrips); setEditTarget(null); notify(`${updated.reference} updated`) }
+  function createFollowup(data: Omit<Followup, 'id' | 'createdAt' | 'status'>) { const now = new Date(); const ts = `${now.getDate()} ${now.toLocaleString('en-GB', { month: 'short' })} ${now.getFullYear()} · ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`; const followup: Followup = { ...data, id: `fu-${Date.now()}`, createdAt: ts, status: 'Open' }; const next = [followup, ...followups]; setFollowups(next); void persist('followups', next); setShowFollowup(false); notify('Follow-up created') }
+  function sendToPump(tx: FuelTransaction) { const next = fuelTransactions.map((t) => t.id === tx.id ? { ...t, status: 'Sent' as const } : t); setFuelTransactions(next); void persist('fuel-transactions', next); notify(`Fuel sent to pump for ${tx.tripRef}`) }
+  function resendToPump(tx: FuelTransaction) { const next = fuelTransactions.map((t) => t.id === tx.id ? { ...t, status: 'Resent' as const } : t); setFuelTransactions(next); void persist('fuel-transactions', next); notify(`Fuel resent to pump for ${tx.tripRef}`) }
   async function addExtra(data: Extra) { const tripId = selected?.id; if (!tripId) return; const entity = { ...data, tripId }; const currentExtras = trips.flatMap((trip) => trip.extras.map((extra) => ({ ...extra, tripId: trip.id }))); const nextExtras = [...currentExtras, entity]; const result = await persist('extras', nextExtras); const hydratedTrip = result.trip as Trip | undefined; const nextTrips = trips.map((trip) => trip.id === tripId ? { ...trip, extras: hydratedTrip?.extras || [...trip.extras, data] } : trip); setTrips(nextTrips); setSelected(nextTrips.find((trip) => trip.id === tripId) || selected); setShowExtra(false); notify(`${data.type} request submitted`) }
   async function addDocument(data: TripDocument) { const tripId = selected?.id; if (!tripId) return; const entity = { ...data, tripId }; const currentDocuments = trips.flatMap((trip) => trip.documents.map((document) => ({ ...document, tripId: trip.id }))); const nextDocuments = [...currentDocuments, entity]; const result = await persist('documents', nextDocuments); const hydratedTrip = result.trip as Trip | undefined; const nextTrips = trips.map((trip) => trip.id === tripId ? { ...trip, documents: hydratedTrip?.documents || [...trip.documents, data] } : trip); setTrips(nextTrips); setSelected(nextTrips.find((trip) => trip.id === tripId) || selected); setShowDocument(false); notify(`${data.type} document uploaded`) }
 
-  const title = view === 'dashboard' ? 'Good morning, Alex' : view === 'requests' || view === 'request-detail' ? 'Trip requests' : view === 'trips' || view === 'trip-detail' ? 'Trips' : view === 'reports-ops' ? 'Trip Operations Report' : view === 'reports-fuel' ? 'Fuel & Trip Expense Report' : 'Overview'
+  const title = view === 'dashboard' ? 'Good morning, Alex' : view === 'requests' || view === 'request-detail' ? 'Trip requests' : view === 'trips' || view === 'trip-detail' ? 'Trips' : view === 'followups' ? 'Follow-ups' : view === 'fuel' ? 'Fuel transactions' : view === 'reports-ops' ? 'Trip Operations Report' : view === 'reports-fuel' ? 'Fuel & Trip Expense Report' : 'Overview'
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">D</span><span>Dev Roadways</span></div>
@@ -108,6 +117,8 @@ export default function OpsDashboard() {
               </>
             )}
             <NavItem active={view === 'trips'} label="Trips" onClick={() => setView('trips')} icon={<Truck size={18} />} />
+            {role === 'Operations' && <NavItem active={view === 'followups'} label="Follow-ups" count={followups.filter((f) => f.status === 'Open').length || undefined} onClick={() => setView('followups')} icon={<Clock size={18} />} />}
+            {role !== 'Driver' && <NavItem active={view === 'fuel'} label="Fuel transactions" onClick={() => setView('fuel')} icon={<GasPump size={18} />} />}
           </>
         )}
       </nav>
@@ -157,7 +168,9 @@ export default function OpsDashboard() {
             {view === 'requests' && role !== 'Driver' && <RequestList requests={visibleRequests} onOpen={(r) => { setSelected(r); setView('request-detail') }} onCreate={() => setShowCreate(true)} onImport={() => setShowImport(true)} />}
             {view === 'request-detail' && selected && <RequestDetail request={selected as Request} role={role} onBack={() => setView('requests')} onAccept={acceptRequest} onReject={rejectRequest} onReminder={() => sendReminder(selected as Request)} onEdit={() => { if (role !== 'Driver') setEditTarget(selected as Request) }} />}
             {view === 'trips' && <TripList trips={visibleTrips} onOpen={(t) => { setSelected(t); setView('trip-detail') }} />}
-            {view === 'trip-detail' && selected && <><TripDetail trip={selected as Trip} role={role} onBack={() => setView('trips')} onExtra={() => setShowExtra(true)} onDocument={() => setShowDocument(true)} onEdit={() => { if (role !== 'Driver') setEditTarget(selected as Trip) }} /></>}
+            {view === 'trip-detail' && selected && <><TripDetail trip={selected as Trip} role={role} onBack={() => setView('trips')} onExtra={() => setShowExtra(true)} onDocument={() => setShowDocument(true)} onEdit={() => { if (role !== 'Driver') setEditTarget(selected as Trip) }} onFollowup={role === 'Operations' ? () => { setFollowupTripFilter((selected as Trip).reference); setView('followups') } : undefined} /></>}
+            {view === 'followups' && role === 'Operations' && <FollowupsPage followups={followups} trips={trips} defaultTripFilter={followupTripFilter} onClearDefaultFilter={() => setFollowupTripFilter('')} onCall={(fu) => { window.location.href = `tel:${fu.driverPhone}` }} onOpenTrip={(tripId) => { const t = trips.find((x) => x.id === tripId); if (t) { setSelected(t); setView('trip-detail') } }} onCreate={() => setShowFollowup(true)} />}
+            {view === 'fuel' && role !== 'Driver' && <FuelTransactionsPage transactions={fuelTransactions} onSendToPump={sendToPump} onResend={resendToPump} />}
             {view === 'reports-ops' && <TripOpsReport trips={trips} />}
             {view === 'reports-fuel' && <FuelExpenseReport trips={trips} />}
           </>
@@ -188,6 +201,8 @@ export default function OpsDashboard() {
                   </>
                 )}
                 <NavItem active={view === 'trips'} label="Trips" onClick={() => { setView('trips'); setMobileNavOpen(false) }} icon={<Truck size={18} />} />
+                {role === 'Operations' && <NavItem active={view === 'followups'} label="Follow-ups" count={followups.filter((f) => f.status === 'Open').length || undefined} onClick={() => { setView('followups'); setMobileNavOpen(false) }} icon={<Clock size={18} />} />}
+                {role !== 'Driver' && <NavItem active={view === 'fuel'} label="Fuel transactions" onClick={() => { setView('fuel'); setMobileNavOpen(false) }} icon={<GasPump size={18} />} />}
               </>
             )}
           </nav>
@@ -204,6 +219,7 @@ export default function OpsDashboard() {
     {showImport && <ImportModal onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); notify('Excel preview validated — 2 requests ready') }} />}
     {showExtra && <ExtraModal onClose={() => setShowExtra(false)} onCreate={addExtra} />}
     {showDocument && <DocumentModal onClose={() => setShowDocument(false)} onCreate={addDocument} />}
+    {showFollowup && <FollowupModal trips={trips} onClose={() => setShowFollowup(false)} onCreate={createFollowup} />}
     {editTarget && <EditModal entity={editTarget} onClose={() => setEditTarget(null)} onSave={updateEntity} />}
   </div>
 }
@@ -352,23 +368,28 @@ function RequestDetail({ request, role, onBack, onAccept, onReject, onReminder, 
 }
 
 function to12Hour(time: string) { const [hours, minutes] = time.split(':').map(Number); if (Number.isNaN(hours) || Number.isNaN(minutes)) return time; const suffix = hours >= 12 ? 'PM' : 'AM'; const hour = hours % 12 || 12; return `${hour}:${String(minutes).padStart(2, '0')} ${suffix}` }
+function toDatetimeLocal(date: string, time: string): string { try { const months: Record<string, number> = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 }; const parts = date.trim().split(' '); if (parts.length === 3) { const d = new Date(Number(parts[2]), months[parts[1]] ?? 0, Number(parts[0]), Number(time.split(':')[0] || '0'), Number(time.split(':')[1] || '0')); if (!isNaN(d.getTime())) return `${parts[2]}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` } return '' } catch { return '' } }
+function fromDatetimeLocal(value: string): { date: string; time: string } { if (!value) return { date: '', time: '' }; const d = new Date(value); const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']; return { date: `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`, time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` } }
 function Info({ label, value }: { label: string; value: string }) { return <div><small>{label}</small><b>{value}</b></div> }
 function TripList({ trips, onOpen }: { trips: Trip[]; onOpen: (t: Trip) => void }) { return <section className="panel list-panel"><div className="panel-header"><div><h2>{trips.length} trips</h2></div></div>{trips.map((t) => <div key={t.id}><TripRow trip={t} onClick={() => onOpen(t)} /></div>)}{!trips.length && <Empty label="No trips assigned to you" />}</section> }
 
-function TripDetail({ trip, role, onBack, onExtra, onDocument, onEdit }: { trip: Trip; role: Role; onBack: () => void; onExtra: () => void; onDocument: () => void; onEdit: () => void }) {
+function TripDetail({ trip, role, onBack, onExtra, onDocument, onEdit, onFollowup }: { trip: Trip; role: Role; onBack: () => void; onExtra: () => void; onDocument: () => void; onEdit: () => void; onFollowup?: () => void }) {
   return (
     <section className="detail">
       <button className="back" onClick={onBack}><ArrowLeft size={16} style={{ display: 'inline', marginRight: 4 }} /> Back to trips</button>
       <div className="detail-heading">
         <div><p className="eyebrow">Trip details</p><h1>{trip.reference}</h1><p className="subheading">{trip.customer} · Created {trip.createdAt}</p></div>
-        <div className="detail-heading-right">
-          {(role === 'Coordinator' || role === 'Operations') && <button className="quick-action-icon" aria-label="Edit trip" title="Edit trip" onClick={onEdit}><PencilSimple size={16} /></button>}
-          {role === 'Driver' && <div className="detail-quick-actions"><button className="quick-action-icon" aria-label="Upload trip document" title="Upload trip document" onClick={onDocument}><UploadSimple size={16} /></button><button className="quick-action-icon" aria-label="Submit extra request" title="Submit extra request" onClick={onExtra}><Plus size={16} /></button></div>}
+        <div className="detail-heading-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
           <Status>{trip.tripStatus}</Status>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {role === 'Operations' && onFollowup && <button className="button secondary compact" onClick={onFollowup} style={{ height: 32 }}><span>Followups</span></button>}
+            {(role === 'Coordinator' || role === 'Operations') && <button className="quick-action-icon" aria-label="Edit trip" title="Edit trip" onClick={onEdit} style={{ width: 32, height: 32 }}><PencilSimple size={16} /></button>}
+            {role === 'Driver' && <div className="detail-quick-actions"><button className="quick-action-icon" aria-label="Upload trip document" title="Upload trip document" onClick={onDocument}><UploadSimple size={16} /></button><button className="quick-action-icon" aria-label="Submit extra request" title="Submit extra request" onClick={onExtra}><Plus size={16} /></button></div>}
+          </div>
         </div>
       </div>
       <div className="detail-grid">
-        <div className="panel">
+        <div className="panel" style={{ gridColumn: role === 'Operations' ? 'span 2' : undefined }}>
           <h2>Journey</h2>
           <div className="journey journey-times">
             <div><small>Pickup</small><b>{trip.origin}</b><span><em>Scheduled</em><b>{trip.pickupDate}</b><b>{to12Hour(trip.pickupTime)}</b></span><span><em>Actual</em><b>{trip.pickupDate}</b><b>{to12Hour(trip.pickupTime)}</b></span></div>
@@ -387,11 +408,13 @@ function TripDetail({ trip, role, onBack, onExtra, onDocument, onEdit }: { trip:
           {trip.documents.map((doc) => <div className="extra-row" key={doc.id}><span className="extra-icon"><FileText size={16} /></span><div><b>{doc.name}</b><p>{doc.type} · {doc.uploadedAt}</p></div><Status>Approved</Status></div>)}
           {!trip.documents.length && <Empty label="No documents uploaded" />}
         </div>
-        <div className="panel action-panel">
-          <h2>Driver actions</h2>
-          <p>Submit an expense or operational request linked to this trip.</p>
-          {role === 'Driver' && <><button className="button primary wide" onClick={onDocument}><UploadSimple size={16} style={{ display: 'inline', marginRight: 6 }} /> Upload trip document</button><button className="button primary wide" onClick={onExtra}><Plus size={16} style={{ display: 'inline', marginRight: 6 }} /> Extra request</button></>}
-        </div>
+        {role !== 'Operations' && (
+          <div className="panel action-panel">
+            <h2>Driver actions</h2>
+            <p>Submit an expense or operational request linked to this trip.</p>
+            {role === 'Driver' && <><button className="button primary wide" onClick={onDocument}><UploadSimple size={16} style={{ display: 'inline', marginRight: 6 }} /> Upload trip document</button><button className="button primary wide" onClick={onExtra}><Plus size={16} style={{ display: 'inline', marginRight: 6 }} /> Extra request</button></>}
+          </div>
+        )}
       </div>
     </section>
   )
@@ -401,8 +424,66 @@ function InfoSection({ title, children }: { title: string; children: React.React
 function DriverDetails({ trip }: { trip: Trip }) { return <section className="panel driver-details-panel"><InfoSection title="Driver details"><Info label="Driver name" value={trip.driver || 'Unassigned'} /><Info label="Phone number" value={trip.driverNumber || 'Not available'} /></InfoSection></section> }
 function Empty({ label }: { label: string }) { return <div className="empty">{label}</div> }
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) { return <div className="modal-backdrop"><div className="modal"><div className="modal-header"><h2>{title}</h2><button onClick={onClose} aria-label="Close"><X size={18} /></button></div>{children}</div></div> }
-function EditModal({ entity, onClose, onSave }: { entity: Request | Trip; onClose: () => void; onSave: (data: Partial<Request>) => void }) { const [reference, setReference] = useState(entity.reference); const [customer, setCustomer] = useState(entity.customer); const [origin, setOrigin] = useState(entity.origin); const [destination, setDestination] = useState(entity.destination); const [date, setDate] = useState(entity.date); const [time, setTime] = useState(entity.time); const [deliveryDate, setDeliveryDate] = useState(entity.requestedDeliveryDate || entity.date); const [deliveryTime, setDeliveryTime] = useState(entity.requestedDeliveryTime || entity.time); const [cargoMaterial, setCargoMaterial] = useState(entity.cargoMaterial || 'Cement'); const [cargoCompany, setCargoCompany] = useState(entity.cargoCompany || entity.customer); const [cargoWeight, setCargoWeight] = useState(entity.cargoWeight || ''); const [cargoType, setCargoType] = useState<Request['cargoType']>(entity.cargoType || 'Bagged'); const [noOfBags, setNoOfBags] = useState(entity.noOfBags || ''); return <Modal title={`Edit ${'tripStatus' in entity ? 'trip' : 'request'}`} onClose={onClose}><form onSubmit={(e) => { e.preventDefault(); onSave({ reference, customer, origin, destination, date, time, requestedDeliveryDate: deliveryDate, requestedDeliveryTime: deliveryTime, cargoMaterial, cargoCompany, cargoWeight, cargoType, noOfBags, passengers: Number(noOfBags) || entity.passengers }) }}><label>Reference<input value={reference} onChange={(e) => setReference(e.target.value)} /></label><label>Customer<input value={customer} onChange={(e) => setCustomer(e.target.value)} /></label><div className="form-row"><label>Pickup<input value={origin} onChange={(e) => setOrigin(e.target.value)} /></label><label>Drop-off<input value={destination} onChange={(e) => setDestination(e.target.value)} /></label></div><div className="form-row"><label>Requested date<input value={date} onChange={(e) => setDate(e.target.value)} /></label><label>Requested time<input value={time} onChange={(e) => setTime(e.target.value)} /></label></div><div className="form-row"><label>Delivery date<input value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} /></label><label>Delivery time<input value={deliveryTime} onChange={(e) => setDeliveryTime(e.target.value)} /></label></div><label>Material<input value={cargoMaterial} onChange={(e) => setCargoMaterial(e.target.value)} /></label><div className="form-row"><label>Cargo weight<input value={cargoWeight} onChange={(e) => setCargoWeight(e.target.value)} placeholder="28 tonnes" /></label><label>Cargo type<select value={cargoType} onChange={(e) => setCargoType(e.target.value as Request['cargoType'])}><option value="Bagged">Bagged</option><option value="Loose">Loose</option></select></label></div><label>No. of bags<input value={noOfBags} onChange={(e) => setNoOfBags(e.target.value)} placeholder="560 bags" /></label><button className="button primary wide" type="submit">Save changes</button></form></Modal> }
-function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (r: Request) => void }) { const [reference, setReference] = useState(''); const [customer, setCustomer] = useState(''); const [origin, setOrigin] = useState(''); const [destination, setDestination] = useState(''); const [date, setDate] = useState(''); const [time, setTime] = useState(''); const [deliveryDate, setDeliveryDate] = useState(''); const [deliveryTime, setDeliveryTime] = useState(''); const [cargoMaterial, setCargoMaterial] = useState('Cement'); const [cargoCompany, setCargoCompany] = useState(''); const [cargoWeight, setCargoWeight] = useState(''); const [cargoType, setCargoType] = useState<Request['cargoType']>('Bagged'); const [noOfBags, setNoOfBags] = useState(''); const submit = (e: React.FormEvent) => { e.preventDefault(); onCreate({ id: `req-${Date.now()}`, reference: reference || `DR-${1050 + Math.floor(Math.random() * 20)}`, customer: customer || 'New customer', origin: origin || 'Wadgaon, Pune', destination: destination || 'Nashik MIDC', date: date || '20 Aug 2026', time: time || '09:00', requestedDeliveryDate: deliveryDate || date || '20 Aug 2026', requestedDeliveryTime: deliveryTime || time || '09:00', cargoMaterial, cargoCompany: cargoCompany || customer, cargoWeight, cargoType, noOfBags: noOfBags || '1 bag', createdAt: (() => { const now = new Date(); const day = now.getDate(); const month = now.toLocaleString('en-GB', { month: 'short' }); const year = now.getFullYear(); const hours = now.getHours(); const minutes = String(now.getMinutes()).padStart(2, '0'); const suffix = hours >= 12 ? 'PM' : 'AM'; const hour12 = hours % 12 || 12; return `${day} ${month} ${year} · ${hour12}:${minutes} ${suffix}`; })(), passengers: Number(noOfBags) || 1, status: 'Pending' }) }; return <Modal title="Create trip request" onClose={onClose}><form onSubmit={submit}><label>Reference<input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="DR-1049" /></label><label>Customer<input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Company or person" /></label><div className="form-row"><label>Pickup<input value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="City or address" /></label><label>Drop-off<input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="City or address" /></label></div><div className="form-row"><label>Requested date<input value={date} onChange={(e) => setDate(e.target.value)} placeholder="19 Aug 2026" /></label><label>Requested time<input value={time} onChange={(e) => setTime(e.target.value)} placeholder="10:00 AM" /></label></div><div className="form-row"><label>Delivery date<input value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} placeholder="19 Aug 2026" /></label><label>Delivery time<input value={deliveryTime} onChange={(e) => setDeliveryTime(e.target.value)} placeholder="10:00 AM" /></label></div><div className="form-row"><label>Cargo weight<input value={cargoWeight} onChange={(e) => setCargoWeight(e.target.value)} placeholder="28 tonnes" /></label><label>Cargo type<select value={cargoType} onChange={(e) => setCargoType(e.target.value as Request['cargoType'])}><option value="Bagged">Bagged</option><option value="Loose">Loose</option></select></label></div><label>No. of bags<input value={noOfBags} onChange={(e) => setNoOfBags(e.target.value)} placeholder="560 bags" /></label><button className="button primary wide" type="submit">Create request</button></form></Modal> }
+function EditModal({ entity, onClose, onSave }: { entity: Request | Trip; onClose: () => void; onSave: (data: Partial<Request>) => void }) {
+  const [reference, setReference] = useState(entity.reference)
+  const [customer, setCustomer] = useState(entity.customer)
+  const [origin, setOrigin] = useState(entity.origin)
+  const [destination, setDestination] = useState(entity.destination)
+  const [pickupDT, setPickupDT] = useState(toDatetimeLocal(entity.date, entity.time))
+  const [deliveryDT, setDeliveryDT] = useState(toDatetimeLocal(entity.requestedDeliveryDate || entity.date, entity.requestedDeliveryTime || entity.time))
+  const [cargoMaterial, setCargoMaterial] = useState(entity.cargoMaterial || 'Cement')
+  const [cargoWeight, setCargoWeight] = useState(entity.cargoWeight || '')
+  const [cargoType, setCargoType] = useState<Request['cargoType']>(entity.cargoType || 'Bagged')
+  const [noOfBags, setNoOfBags] = useState(entity.noOfBags || '')
+  return (
+    <Modal title={`Edit ${'tripStatus' in entity ? 'trip' : 'request'}`} onClose={onClose}>
+      <form onSubmit={(e) => { e.preventDefault(); const { date, time } = fromDatetimeLocal(pickupDT); const { date: dDate, time: dTime } = fromDatetimeLocal(deliveryDT); onSave({ reference, customer, origin, destination, date, time, requestedDeliveryDate: dDate, requestedDeliveryTime: dTime, cargoMaterial, cargoWeight, cargoType, noOfBags, passengers: Number(noOfBags) || entity.passengers }) }}>
+        <label>Reference<input value={reference} onChange={(e) => setReference(e.target.value)} /></label>
+        <label>Customer<input value={customer} onChange={(e) => setCustomer(e.target.value)} /></label>
+        <div className="form-row"><label>Pickup<input value={origin} onChange={(e) => setOrigin(e.target.value)} /></label><label>Drop-off<input value={destination} onChange={(e) => setDestination(e.target.value)} /></label></div>
+        <label>Pickup date &amp; time<input type="datetime-local" value={pickupDT} onChange={(e) => setPickupDT(e.target.value)} /></label>
+        <label>Delivery date &amp; time<input type="datetime-local" value={deliveryDT} onChange={(e) => setDeliveryDT(e.target.value)} /></label>
+        <label>Material<input value={cargoMaterial} onChange={(e) => setCargoMaterial(e.target.value)} /></label>
+        <div className="form-row"><label>Cargo weight<input value={cargoWeight} onChange={(e) => setCargoWeight(e.target.value)} placeholder="28 tonnes" /></label><label>Cargo type<select value={cargoType} onChange={(e) => setCargoType(e.target.value as Request['cargoType'])}><option value="Bagged">Bagged</option><option value="Loose">Loose</option></select></label></div>
+        <label>No. of bags<input value={noOfBags} onChange={(e) => setNoOfBags(e.target.value)} placeholder="560 bags" /></label>
+        <button className="button primary wide" type="submit">Save changes</button>
+      </form>
+    </Modal>
+  )
+}
+function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (r: Request) => void }) {
+  const [reference, setReference] = useState('')
+  const [customer, setCustomer] = useState('')
+  const [origin, setOrigin] = useState('')
+  const [destination, setDestination] = useState('')
+  const [pickupDT, setPickupDT] = useState('')
+  const [deliveryDT, setDeliveryDT] = useState('')
+  const [cargoMaterial, setCargoMaterial] = useState('Cement')
+  const [cargoWeight, setCargoWeight] = useState('')
+  const [cargoType, setCargoType] = useState<Request['cargoType']>('Bagged')
+  const [noOfBags, setNoOfBags] = useState('')
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const { date, time } = fromDatetimeLocal(pickupDT)
+    const { date: dDate, time: dTime } = fromDatetimeLocal(deliveryDT)
+    const now = new Date(); const day = now.getDate(); const month = now.toLocaleString('en-GB', { month: 'short' }); const year = now.getFullYear(); const hours = now.getHours(); const mins = String(now.getMinutes()).padStart(2, '0'); const sfx = hours >= 12 ? 'PM' : 'AM'; const h12 = hours % 12 || 12
+    onCreate({ id: `req-${Date.now()}`, reference: reference || `DR-${1050 + Math.floor(Math.random() * 20)}`, customer: customer || 'New customer', origin: origin || 'Wadgaon, Pune', destination: destination || 'Nashik MIDC', date: date || '20 Aug 2026', time: time || '09:00', requestedDeliveryDate: dDate || date || '20 Aug 2026', requestedDeliveryTime: dTime || time || '09:00', cargoMaterial, cargoCompany: customer, cargoWeight, cargoType, noOfBags: noOfBags || '1 bag', createdAt: `${day} ${month} ${year} · ${h12}:${mins} ${sfx}`, passengers: Number(noOfBags) || 1, status: 'Pending' })
+  }
+  return (
+    <Modal title="Create trip request" onClose={onClose}>
+      <form onSubmit={submit}>
+        <label>Reference<input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="DR-1049" /></label>
+        <label>Customer<input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Company or person" /></label>
+        <div className="form-row"><label>Pickup<input value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="City or address" /></label><label>Drop-off<input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="City or address" /></label></div>
+        <label>Pickup date &amp; time<input type="datetime-local" value={pickupDT} onChange={(e) => setPickupDT(e.target.value)} /></label>
+        <label>Delivery date &amp; time<input type="datetime-local" value={deliveryDT} onChange={(e) => setDeliveryDT(e.target.value)} /></label>
+        <div className="form-row"><label>Cargo weight<input value={cargoWeight} onChange={(e) => setCargoWeight(e.target.value)} placeholder="28 tonnes" /></label><label>Cargo type<select value={cargoType} onChange={(e) => setCargoType(e.target.value as Request['cargoType'])}><option value="Bagged">Bagged</option><option value="Loose">Loose</option></select></label></div>
+        <label>No. of bags<input value={noOfBags} onChange={(e) => setNoOfBags(e.target.value)} placeholder="560 bags" /></label>
+        <button className="button primary wide" type="submit">Create request</button>
+      </form>
+    </Modal>
+  )
+}
 function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) { return <Modal title="Import requests" onClose={onClose}><div className="upload"><UploadSimple size={24} style={{ color: 'var(--blue)' }} /><b>Drop your Excel file here</b><p>or choose a .xlsx file from your device</p><button className="button secondary">Choose file</button></div><div className="import-preview"><b>Preview ready</b><span>2 valid requests · 0 errors</span></div><button className="button primary wide" onClick={onDone}>Validate and import</button></Modal> }
 function ExtraModal({ onClose, onCreate }: { onClose: () => void; onCreate: (x: Extra) => void }) { const [type, setType] = useState<Extra['type']>('Fuel'); const [amount, setAmount] = useState(''); const [note, setNote] = useState(''); return <Modal title="Submit extra request" onClose={onClose}><form onSubmit={(e) => { e.preventDefault(); onCreate({ id: `ex-${Date.now()}`, type, amount: amount.trim() ? `₹${amount.trim()}` : '₹0', note: note.trim() || 'Submitted by driver for review', status: 'Submitted' }) }}><label>Request type<select value={type} onChange={(e) => setType(e.target.value as Extra['type'])}><option>Fuel</option><option>Cash</option><option>AdBlue</option></select></label><label>Amount<input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder="5000" /></label><label>Note<textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a short note" rows={3} /></label><button className="button primary wide" type="submit">Submit request</button></form></Modal> }
 function DocumentModal({ onClose, onCreate }: { onClose: () => void; onCreate: (x: TripDocument) => void }) { const [type, setType] = useState<TripDocument['type']>('LR'); const [name, setName] = useState(''); return <Modal title="Upload trip document" onClose={onClose}><form onSubmit={(e) => { e.preventDefault(); onCreate({ id: `doc-${Date.now()}`, name: name || `Trip-document-${type}.pdf`, type, uploadedAt: 'Just now' }) }}><div className="upload"><UploadSimple size={24} style={{ color: 'var(--blue)' }} /><b>Select a document</b><p>PDF, JPG, or PNG up to 10 MB</p><input type="file" onChange={(e) => setName(e.target.files?.[0]?.name || '')} /></div><label>Document type<select value={type} onChange={(e) => setType(e.target.value as TripDocument['type'])}><option>LR</option><option>WB</option><option>Invoice</option><option>Other</option></select></label><button className="button primary wide" type="submit">Upload document</button></form></Modal> }
@@ -412,23 +493,23 @@ function TripOpsReport({ trips }: { trips: Trip[] }) {
   const [searchQuery, setSearchQuery] = useState('')
 
   // Summary — all from real trips data
-  const total     = trips.length
-  const accepted  = trips.filter(t => t.status === 'Accepted').length
-  const rejected  = trips.filter(t => t.status === 'Rejected').length
-  const active    = trips.filter(t => t.tripStatus === 'In progress').length
+  const total = trips.length
+  const accepted = trips.filter(t => t.status === 'Accepted').length
+  const rejected = trips.filter(t => t.status === 'Rejected').length
+  const active = trips.filter(t => t.tripStatus === 'In progress').length
   const completed = trips.filter(t => t.tripStatus === 'Completed').length
-  const pending   = trips.filter(t => t.tripStatus === 'Scheduled').length
+  const pending = trips.filter(t => t.tripStatus === 'Scheduled').length
 
   // Table rows — mapped from real trips
   const rows = trips.map(t => ({
-    id:          t.reference,
-    source:      t.origin,
+    id: t.reference,
+    source: t.origin,
     destination: t.destination,
-    loadType:    t.cargo?.loadType ?? '—',
-    weight:      t.cargo?.quantity ?? '—',
-    driver:      t.driver || 'Unassigned',
-    status:      t.tripStatus,
-    delivery:    t.estimatedDropDate || t.date,
+    loadType: t.cargo?.loadType ?? '—',
+    weight: t.cargo?.quantity ?? '—',
+    driver: t.driver || 'Unassigned',
+    status: t.tripStatus,
+    delivery: t.estimatedDropDate || t.date,
   }))
 
   const filteredRows = rows.filter(r => {
@@ -465,17 +546,17 @@ function TripOpsReport({ trips }: { trips: Trip[] }) {
 
   // Bar chart — real counts
   const dist = [
-    { label: 'Pending',     count: pending,    color: '#3b82f6' },
-    { label: 'In progress', count: active,      color: '#8b5cf6' },
-    { label: 'Completed',   count: completed,   color: '#10b981' },
+    { label: 'Pending', count: pending, color: '#3b82f6' },
+    { label: 'In progress', count: active, color: '#8b5cf6' },
+    { label: 'Completed', count: completed, color: '#10b981' },
   ]
   const maxCount = Math.max(...dist.map(d => d.count), 1)
 
   const statusChip = (s: string) => {
     const map: Record<string, { bg: string; color: string }> = {
-      'Completed':   { bg: '#dcfce7', color: '#166534' },
+      'Completed': { bg: '#dcfce7', color: '#166534' },
       'In progress': { bg: '#ede9fe', color: '#5b21b6' },
-      'Scheduled':   { bg: '#dbeafe', color: '#1d4ed8' },
+      'Scheduled': { bg: '#dbeafe', color: '#1d4ed8' },
     }
     const c = map[s] ?? { bg: '#f1f5f9', color: '#475569' }
     return <span style={{ display: 'inline-block', padding: '0.2rem 0.6rem', borderRadius: 9999, fontSize: '0.75rem', fontWeight: 500, whiteSpace: 'nowrap', background: c.bg, color: c.color }}>{s}</span>
@@ -578,7 +659,7 @@ function FuelExpenseReport({ trips }: { trips: Trip[] }) {
 
   const dummyRows = [
     { trip: 'TR-001', driver: 'Rahul', truck: 'MH13AB1234', fuelAuth: '120 L', fuelRec: '115 L', authN: 120, recN: 115, cash: '₹2,000', extraFuel: false },
-    { trip: 'TR-002', driver: 'Amit',  truck: 'MH13CD5678', fuelAuth: '100 L', fuelRec: '102 L', authN: 100, recN: 102, cash: '₹1,500', extraFuel: true  },
+    { trip: 'TR-002', driver: 'Amit', truck: 'MH13CD5678', fuelAuth: '100 L', fuelRec: '102 L', authN: 100, recN: 102, cash: '₹1,500', extraFuel: true },
     { trip: 'TR-003', driver: 'Sagar', truck: 'MH13EF9012', fuelAuth: '130 L', fuelRec: '125 L', authN: 130, recN: 125, cash: '₹2,500', extraFuel: false },
   ]
 
@@ -609,7 +690,7 @@ function FuelExpenseReport({ trips }: { trips: Trip[] }) {
   }
 
   const totalAuth = dummyRows.reduce((s, r) => s + r.authN, 0)
-  const totalRec  = dummyRows.reduce((s, r) => s + r.recN,  0)
+  const totalRec = dummyRows.reduce((s, r) => s + r.recN, 0)
   const extraCount = dummyRows.filter(r => r.extraFuel).length
   const maxFuel = Math.max(totalAuth, totalRec, 1)
 
@@ -684,7 +765,7 @@ function FuelExpenseReport({ trips }: { trips: Trip[] }) {
         <div style={{ padding: '0 1rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {[
             { label: 'Authorized', value: totalAuth, color: '#3b82f6' },
-            { label: 'Recorded',   value: totalRec,  color: '#10b981' },
+            { label: 'Recorded', value: totalRec, color: '#10b981' },
           ].map(bar => (
             <div key={bar.label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 64px', alignItems: 'center', gap: '0.75rem' }}>
               <span style={{ fontSize: '0.8125rem', color: '#475569', fontWeight: 500 }}>{bar.label}</span>
@@ -704,3 +785,130 @@ function FuelExpenseReport({ trips }: { trips: Trip[] }) {
     </div>
   )
 }
+
+function FollowupsPage({ followups, trips, defaultTripFilter, onClearDefaultFilter, onCall, onOpenTrip, onCreate }: { followups: Followup[]; trips: Trip[]; defaultTripFilter?: string; onClearDefaultFilter?: () => void; onCall: (fu: Followup) => void; onOpenTrip: (tripId: string) => void; onCreate: () => void }) {
+  const [query, setQuery] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+  const [tripFilter, setTripFilter] = useState(defaultTripFilter || 'All')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [sortAsc, setSortAsc] = useState(true)
+  const tripOptions = ['All', ...Array.from(new Set(followups.map((f) => f.tripRef)))]
+  useEffect(() => { if (defaultTripFilter) { setTripFilter(defaultTripFilter); onClearDefaultFilter?.() } }, [defaultTripFilter])
+  const parseDue = (fu: Followup) => { try { const months: Record<string, number> = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 }; const p = fu.dueDate.trim().split(' '); return new Date(Number(p[2]), months[p[1]] ?? 0, Number(p[0]), Number(fu.dueTime.split(':')[0] ?? '0'), Number(fu.dueTime.split(':')[1] ?? '0')).getTime() } catch { return 0 } }
+  const filtered = followups
+    .filter((f) => (tripFilter === 'All' || f.tripRef === tripFilter) && (statusFilter === 'All' || f.status === statusFilter))
+    .filter((f) => { const q = query.toLowerCase(); return !q || f.driver.toLowerCase().includes(q) || f.tripRef.toLowerCase().includes(q) || f.note.toLowerCase().includes(q) })
+    .sort((a, b) => sortAsc ? parseDue(a) - parseDue(b) : parseDue(b) - parseDue(a))
+  const activeFilters = (tripFilter !== 'All' ? 1 : 0) + (statusFilter !== 'All' ? 1 : 0)
+  return (
+    <section className="panel list-panel">
+      <div className="panel-header">
+        <div><h2>Follow-ups</h2><p>Field communication and driver follow-up log.</p></div>
+        <div className="panel-header-actions">
+          <button className="icon-create" aria-label="New follow-up" title="New follow-up" onClick={onCreate}><Plus size={16} /></button>
+        </div>
+      </div>
+      <div className="filters" style={{ position: 'relative', flexWrap: 'wrap', gap: 8 }}>
+        <div className="search" style={{ flex: 1, minWidth: 180 }}><MagnifyingGlass size={16} style={{ color: '#9ca6b4', marginRight: 4 }} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search driver, trip, note" /></div>
+        <button className="icon-create" title="Filter" aria-label="Filter" onClick={() => setShowFilters((v) => !v)} style={{ position: 'relative' }}>
+          <WarningCircle size={15} />
+          {activeFilters > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: 'var(--blue)', color: 'white', borderRadius: '50%', width: 14, height: 14, fontSize: 8, display: 'grid', placeItems: 'center', fontWeight: 700 }}>{activeFilters}</span>}
+        </button>
+        <button className="icon-create" title={sortAsc ? 'Sort: oldest due first' : 'Sort: newest due first'} aria-label="Sort" onClick={() => setSortAsc((v) => !v)}>
+          <ArrowRight size={15} style={{ transform: sortAsc ? 'rotate(90deg)' : 'rotate(-90deg)', transition: 'transform .2s' }} />
+        </button>
+        {showFilters && (
+          <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: '14px 16px', zIndex: 5, minWidth: 220, boxShadow: '0 8px 24px rgb(24 34 48 / 10%)' }}>
+            <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: 'var(--muted-ink)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Trip</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>{tripOptions.map((t) => <button key={t} className={tripFilter === t ? 'filter active' : 'filter'} style={{ fontSize: 10 }} onClick={() => setTripFilter(t)}>{t}</button>)}</div>
+            <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: 'var(--muted-ink)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Status</p>
+            <div style={{ display: 'flex', gap: 4 }}>{['All', 'Open', 'Done'].map((s) => <button key={s} className={statusFilter === s ? 'filter active' : 'filter'} style={{ fontSize: 10 }} onClick={() => setStatusFilter(s)}>{s}</button>)}</div>
+          </div>
+        )}
+      </div>
+      {filtered.map((fu) => (
+        <div key={fu.id} className="extra-row" style={{ alignItems: 'flex-start', gap: 12, padding: '14px 0' }}>
+          <span className="extra-icon" style={{ marginTop: 2 }}><Clock size={15} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <b style={{ fontSize: 11 }}>{fu.driver}</b>
+              <button className="text-button" style={{ fontSize: 10, padding: 0 }} onClick={() => onOpenTrip(fu.tripId)}>{fu.tripRef} <CaretRight size={10} style={{ display: 'inline' }} /></button>
+              <span className={`status ${fu.status.toLowerCase()}`} style={{ fontSize: 9 }}>{fu.status}</span>
+            </div>
+            <p style={{ fontSize: 10, color: 'var(--muted-ink)', margin: '4px 0 0', lineHeight: 1.5 }}>{fu.note}</p>
+            <small style={{ color: '#9ca6b4', fontSize: 9, display: 'block', marginTop: 4 }}>Due {fu.dueDate} · {to12Hour(fu.dueTime)}</small>
+          </div>
+          <a href={`tel:${fu.driverPhone}`} onClick={(e) => { e.preventDefault(); onCall(fu) }} className="button secondary compact" style={{ fontSize: 11, flexShrink: 0 }} aria-label={`Call ${fu.driver}`} title={`Call ${fu.driver}`}>
+            <span style={{ fontSize: 14 }}>📞</span> Call
+          </a>
+        </div>
+      ))}
+      {!filtered.length && <Empty label="No follow-ups match" />}
+    </section>
+  )
+}
+
+function FollowupModal({ trips, onClose, onCreate }: { trips: Trip[]; onClose: () => void; onCreate: (data: Omit<Followup, 'id' | 'createdAt' | 'status'>) => void }) {
+  const activeTripOptions = trips.filter((t) => t.tripStatus !== 'Completed')
+  const [tripId, setTripId] = useState(activeTripOptions[0]?.id || '')
+  const selectedTrip = trips.find((t) => t.id === tripId)
+  const [note, setNote] = useState('')
+  const [dueDT, setDueDT] = useState('')
+  return (
+    <Modal title="Create follow-up" onClose={onClose}>
+      <form onSubmit={(e) => { e.preventDefault(); if (!selectedTrip) return; const { date: dDate, time: dTime } = fromDatetimeLocal(dueDT); onCreate({ tripId: selectedTrip.id, tripRef: selectedTrip.reference, driver: selectedTrip.driver || 'Unassigned', driverPhone: selectedTrip.driverNumber || '+91 00000 00000', note: note.trim() || 'Follow-up required', dueDate: dDate || 'Today', dueTime: dTime || '12:00' }) }}>
+        <label>Trip
+          <select value={tripId} onChange={(e) => setTripId(e.target.value)}>
+            {activeTripOptions.map((t) => <option key={t.id} value={t.id}>{t.reference} — {t.customer}</option>)}
+            {!activeTripOptions.length && <option value="">No active trips</option>}
+          </select>
+        </label>
+        {selectedTrip && <div style={{ background: 'var(--blue-soft)', borderRadius: 6, padding: '10px 12px', fontSize: 11, color: 'var(--blue)' }}><b>{selectedTrip.driver || 'Unassigned'}</b> · {selectedTrip.driverNumber || 'No phone on file'}</div>}
+        <label>Note<textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="What needs to be followed up?" rows={3} /></label>
+        <label>Due date &amp; time<input type="datetime-local" value={dueDT} onChange={(e) => setDueDT(e.target.value)} /></label>
+        <button className="button primary wide" type="submit">Create follow-up</button>
+      </form>
+    </Modal>
+  )
+}
+
+function FuelTransactionsPage({ transactions, onSendToPump, onResend }: { transactions: FuelTransaction[]; onSendToPump: (tx: FuelTransaction) => void; onResend: (tx: FuelTransaction) => void }) {
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [query, setQuery] = useState('')
+  const filtered = transactions.filter((tx) => {
+    const matchesStatus = statusFilter === 'All' || tx.status === statusFilter
+    const q = query.toLowerCase()
+    const matchesQuery = !q || tx.tripRef.toLowerCase().includes(q) || tx.driver.toLowerCase().includes(q) || tx.station.toLowerCase().includes(q)
+    return matchesStatus && matchesQuery
+  })
+  return (
+    <section className="panel list-panel">
+      <div className="panel-header">
+        <div><h2>Fuel transactions</h2><p>Dispatch fuel authorisations to pump stations.</p></div>
+      </div>
+      <div className="filters">
+        <div className="search"><MagnifyingGlass size={16} style={{ color: '#9ca6b4', marginRight: 4 }} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search trip, driver, station" /></div>
+        <div className="filter-group">{['All', 'Pending', 'Sent', 'Resent'].map((f) => <button key={f} className={statusFilter === f ? 'filter active' : 'filter'} onClick={() => setStatusFilter(f)}>{f}</button>)}</div>
+      </div>
+      {filtered.map((tx) => (
+        <div key={tx.id} className="extra-row" style={{ alignItems: 'center' }}>
+          <span className="extra-icon"><GasPump size={15} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <b style={{ fontSize: 11, display: 'block' }}>{tx.tripRef} · {tx.driver}</b>
+            <small style={{ color: 'var(--muted-ink)', fontSize: 10, display: 'block', marginTop: 3 }}>{tx.station} · {tx.litres}</small>
+          </div>
+          <strong style={{ fontSize: 11, marginLeft: 'auto', flexShrink: 0 }}>{tx.amount}</strong>
+          <span className={`status ${tx.status.toLowerCase()}`} style={{ marginLeft: 10 }}>{tx.status}</span>
+          {tx.status === 'Pending' && (
+            <button className="button primary compact" style={{ marginLeft: 10, fontSize: 11 }} onClick={() => onSendToPump(tx)}>Send to pump</button>
+          )}
+          {(tx.status === 'Sent' || tx.status === 'Resent') && (
+            <button className="button secondary compact" style={{ marginLeft: 10, fontSize: 11 }} onClick={() => onResend(tx)}>Resend</button>
+          )}
+        </div>
+      ))}
+      {!filtered.length && <Empty label="No fuel transactions found" />}
+    </section>
+  )
+}
+
