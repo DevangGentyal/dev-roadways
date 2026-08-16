@@ -1,0 +1,35 @@
+[
+  {
+    "tripId": "req-1046",
+    "driverName": "Ramesh Yadav",
+    "driverNumber": "9421659207",
+    "date": "18-Aug-26",
+    "time": "10:00",
+    "note": "needs to see this follow up",
+    "status": "Upcoming",
+    "id": "fu-1786902749689",
+    "createdAt": "16 Aug 2026, 23:22"
+  },
+  {
+    "id": "fu-1",
+    "tripId": "req-1046",
+    "driverName": "Ramesh Yadav",
+    "driverNumber": "9421659207",
+    "date": "17 Aug 2026",
+    "time": "18:45",
+    "note": "Confirm loading completion and destination ETA before dispatch.",
+    "status": "Upcoming",
+    "createdAt": "16 Aug 2026 · 12:00 PM"
+  },
+  {
+    "id": "fu-2",
+    "tripId": "req-1046",
+    "driverName": "Ramesh Yadav",
+    "driverNumber": "9421659207",
+    "date": "18 Aug 2026",
+    "time": "09:15",
+    "note": "Check vehicle readiness and delivery handoff instructions.",
+    "status": "Upcoming",
+    "createdAt": "16 Aug 2026 · 12:15 PM"
+  }
+]

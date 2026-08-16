@@ -6,5 +6,21 @@
     "note": "my disel got stolen",
     "status": "Submitted",
     "tripId": "req-1046"
+  },
+  {
+    "id": "ex-1786903798652",
+    "type": "Fuel",
+    "amount": "₹0",
+    "note": "fuel tank was leak",
+    "status": "Submitted",
+    "tripId": "req-1046"
+  },
+  {
+    "id": "ex-1786903913106",
+    "type": "Fuel",
+    "amount": "₹30000",
+    "note": "tank was leak",
+    "status": "Submitted",
+    "tripId": "req-1046"
   }
 ]
