@@ -1,0 +1,74 @@
+[
+  {
+    "id": "drv-001",
+    "name": "Ramesh Yadav",
+    "phone_number": 9876543210,
+    "truck_id": "MH13AB4721",
+    "status": "unavailable",
+    "source_location": "Solapur MIDC, Solapur",
+    "documents": []
+  },
+  {
+    "id": "drv-002",
+    "name": "Suresh Kumar",
+    "phone_number": 9823456701,
+    "truck_id": "MH13XY8892",
+    "status": "unavailable",
+    "source_location": "Mohol MIDC, Solapur",
+    "documents": []
+  },
+  {
+    "id": "drv-003",
+    "name": "Mahesh Patil",
+    "phone_number": 9765432189,
+    "truck_id": "MH09FY9095",
+    "status": "unavailable",
+    "source_location": "Hotgi Road, Solapur",
+    "documents": []
+  },
+  {
+    "id": "drv-004",
+    "name": "Dinesh Verma",
+    "phone_number": 9812345678,
+    "truck_id": "MH12GH3341",
+    "status": "available",
+    "source_location": "Tembhurni Bypass, Solapur",
+    "documents": []
+  },
+  {
+    "id": "drv-005",
+    "name": "Prakash Shinde",
+    "phone_number": 9745612380,
+    "truck_id": "MH04KL7723",
+    "status": "unavailable",
+    "source_location": "Akkalkot Road, Solapur",
+    "documents": []
+  },
+  {
+    "id": "drv-006",
+    "name": "Vijay Tiwari",
+    "phone_number": 9934561270,
+    "truck_id": "MH06MN2256",
+    "status": "unavailable",
+    "source_location": "Kurduwadi Junction, Solapur",
+    "documents": []
+  },
+  {
+    "id": "drv-007",
+    "name": "Anil Deshmukh",
+    "phone_number": 9856341207,
+    "truck_id": "MH12PQ5588",
+    "status": "available",
+    "source_location": "Bibis, Pune",
+    "documents": []
+  },
+  {
+    "id": "drv-008",
+    "name": "Santosh More",
+    "phone_number": 9778923456,
+    "truck_id": "MH14RS1190",
+    "status": "available",
+    "source_location": "MG Road, Pune",
+    "documents": []
+  }
+]
