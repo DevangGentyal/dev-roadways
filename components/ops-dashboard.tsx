@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   House,
-  ClipboardText,
   Truck,
   ChartPie,
   GasPump,
@@ -27,18 +26,61 @@ import {
   Drop,
   FileText,
   Clock,
-  CheckCircle,
-  XCircle,
 } from '@phosphor-icons/react'
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 type Role = 'Coordinator' | 'Operations' | 'Driver' | 'Super Admin'
-type RequestStatus = 'Pending' | 'Accepted' | 'Rejected'
-type TripStatus = 'Scheduled' | 'In progress' | 'Completed'
-type Request = { id: string; reference: string; customer: string; origin: string; destination: string; date: string; time: string; requestedDeliveryDate?: string; requestedDeliveryTime?: string; createdAt: string; passengers: number; cargoMaterial?: string; cargoCompany?: string; cargoWeight?: string; cargoType?: 'Bagged' | 'Loose'; noOfBags?: string; status: RequestStatus; driver?: string; driverNumber?: string }
-type Trip = Request & { tripStatus: TripStatus; extras: Extra[]; pickupDate: string; pickupTime: string; estimatedDropDate: string; estimatedDropTime: string; actualDropDate?: string; actualDropTime?: string; cargo: Cargo; truck: Truck; fuel: FuelDetails; cash: CashDetails; documents: TripDocument[] }
+
+type TripStatus =
+  | 'NEW'
+  | 'APPROVED'
+  | 'OP_REJECTED'
+  | 'ACCEPTED'
+  | 'DV_REJECTED'
+  | 'DOCUMENT_UPLOADED'
+  | 'TRIP_STARTED'
+  | 'TRIP_ON_HOLD'
+  | 'REACHED'
+  | 'TRIP_COMPLETED'
+
+type Trip = {
+  id: string
+  reference: string
+  customer: string
+  origin: string
+  destination: string
+  date: string
+  time: string
+  requestedDeliveryDate?: string
+  requestedDeliveryTime?: string
+  createdAt: string
+  passengers: number
+  cargoMaterial?: string
+  cargoCompany?: string
+  cargoWeight?: string
+  cargoType?: 'Bagged' | 'Loose'
+  noOfBags?: string
+  status: TripStatus
+  driver?: string
+  driverNumber?: string
+  pickupDate?: string
+  pickupTime?: string
+  estimatedDropDate?: string
+  estimatedDropTime?: string
+  actualDropDate?: string
+  actualDropTime?: string
+  cargo?: Cargo
+  truck?: TruckInfo
+  fuel?: FuelDetails
+  cash?: CashDetails
+  documents: TripDocument[]
+  extras: Extra[]
+}
+
 type Extra = { id: string; type: 'Fuel' | 'Cash' | 'AdBlue'; amount: string; note: string; status: 'Submitted' | 'Approved' }
 type Cargo = { material: string; company: string; quantity: string; noOfBags?: string; loadType: 'Bagged' | 'Loose' }
-type Truck = { number: string; type: 'Body' | 'Open'; configuration: '10 tyre' | '12 tyre' | '14 tyre' | '16 tyre'; brand: string }
+type TruckInfo = { number: string; type: 'Body' | 'Open'; configuration: '10 tyre' | '12 tyre' | '14 tyre' | '16 tyre'; brand: string }
 type FuelDetails = { assigned: string; received: string; station: string; fulfilledAt: string }
 type CashDetails = { advance: string; paymentMode: 'Cash' | 'UPI' }
 type TripDocument = { id: string; name: string; type: 'LR' | 'WB' | 'Invoice' | 'Other'; uploadedAt: string }
@@ -47,17 +89,67 @@ type FuelTransaction = { id: string; tripId: string; tripRef: string; driver: st
 type Driver = { id: string; name: string; phone_number: number; truck_id: string; status: 'available' | 'unavailable'; source_location: string; documents: unknown[] }
 type Vehicle = { truck_id: string; brand: string; model_name: string; BS6: 'yes' | 'no'; tires_count: number; mileage_kmpl: number; load_capacity: string; type: 'Body' | 'Bulker' | 'Open' }
 
-const seedRequests: Request[] = [
-  { id: 'req-1048', reference: 'DR-1048', customer: 'Ultratech Cement', origin: 'Wadgaon, Pune', destination: 'Nashik MIDC', date: '18 Aug 2026', time: '08:30', createdAt: '16 Aug 2026 · 10:15 AM', passengers: 28, status: 'Pending' },
-  { id: 'req-1047', reference: 'DR-1047', customer: 'Chettinad Cement', origin: 'Ariyalur Plant', destination: 'Coimbatore', date: '19 Aug 2026', time: '10:00', createdAt: '16 Aug 2026 · 11:40 AM', passengers: 30, status: 'Pending' },
-  { id: 'req-1046', reference: 'DR-1046', customer: 'Dalmia Cement', origin: 'Rajgangpur Plant', destination: 'Bhubaneswar', date: '17 Aug 2026', time: '13:15', createdAt: '16 Aug 2026 · 09:20 AM', passengers: 28, status: 'Accepted', driver: 'Ramesh Yadav', driverNumber: 'DRV-021' },
-  { id: 'req-1045', reference: 'DR-1045', customer: 'Shree Cement', origin: 'Beawar Plant', destination: 'Jaipur', date: '16 Aug 2026', time: '07:45', createdAt: '15 Aug 2026 · 04:05 PM', passengers: 26, status: 'Rejected' },
+// ─── Status Helpers ───────────────────────────────────────────────────────────
+
+const STATUS_LABELS: Record<TripStatus, string> = {
+  NEW: 'New',
+  APPROVED: 'Approved',
+  OP_REJECTED: 'Rejected (Ops)',
+  ACCEPTED: 'Accepted',
+  DV_REJECTED: 'Rejected (Driver)',
+  DOCUMENT_UPLOADED: 'Document Uploaded',
+  TRIP_STARTED: 'Trip Started',
+  TRIP_ON_HOLD: 'Trip On Hold',
+  REACHED: 'Reached',
+  TRIP_COMPLETED: 'Trip Completed',
+}
+
+const STATUS_COLORS: Record<TripStatus, { bg: string; color: string }> = {
+  NEW: { bg: '#fef3c7', color: '#d97706' },
+  APPROVED: { bg: '#dbeafe', color: '#1d4ed8' },
+  OP_REJECTED: { bg: '#fee2e2', color: '#dc2626' },
+  ACCEPTED: { bg: '#dbeafe', color: '#1d4ed8' },
+  DV_REJECTED: { bg: '#fee2e2', color: '#dc2626' },
+  DOCUMENT_UPLOADED: { bg: '#e0f2fe', color: '#0369a1' },
+  TRIP_STARTED: { bg: '#ede9fe', color: '#5b21b6' },
+  TRIP_ON_HOLD: { bg: '#fef3c7', color: '#b45309' },
+  REACHED: { bg: '#dcfce7', color: '#166534' },
+  TRIP_COMPLETED: { bg: '#dcfce7', color: '#15803d' },
+}
+
+function getStatusLabel(s: string): string {
+  return STATUS_LABELS[s as TripStatus] ?? s
+}
+
+function getStatusColors(s: string): { bg: string; color: string } {
+  return STATUS_COLORS[s as TripStatus] ?? { bg: '#f1f5f9', color: '#475569' }
+}
+
+// ─── Seed data (fallback) ──────────────────────────────────────────────────────
+
+const seedTrips: Trip[] = [
+  {
+    id: 'req-1', reference: 'DR-101', customer: 'Ultratech Cement', origin: 'Solapur MIDC', destination: 'Koregaon Village',
+    date: '18 Aug 2026', time: '08:30', requestedDeliveryDate: '19 Aug 2026', requestedDeliveryTime: '12:00',
+    cargoMaterial: 'Portland Cement', cargoCompany: 'Ultratech Cement', cargoWeight: '15 tons', cargoType: 'Bagged', noOfBags: '300 bags',
+    createdAt: '16 Aug 2026 · 10:15 AM', passengers: 300, status: 'TRIP_STARTED', driver: 'Ramesh Yadav', driverNumber: 'DRV-021',
+    pickupDate: '18 Aug 2026', pickupTime: '08:30', estimatedDropDate: '19 Aug 2026', estimatedDropTime: '12:00',
+    cargo: { material: 'Portland Cement', company: 'Ultratech Cement', quantity: '15 tons', noOfBags: '300 bags', loadType: 'Bagged' },
+    truck: { number: 'MH-01-AB-1234', type: 'Body', configuration: '12 tyre', brand: 'Tata Motors' },
+    fuel: { assigned: '120 L', received: '120 L', station: 'BPCL Hotgi Road', fulfilledAt: '18 Aug 2026 · 09:00' },
+    cash: { advance: '₹25,000', paymentMode: 'UPI' }, documents: [], extras: [],
+  },
+  {
+    id: 'req-3', reference: 'DR-103', customer: 'Shree Cement', origin: 'Hotgi Road, Solapur', destination: 'Tuljapur Village',
+    date: '19 Aug 2026', time: '14:15', createdAt: '16 Aug 2026 · 09:20 AM', passengers: 0, status: 'NEW',
+    documents: [], extras: [],
+  },
 ]
-const seedTrips: Trip[] = [{ ...seedRequests[2], tripStatus: 'In progress', pickupDate: '17 Aug 2026', pickupTime: '13:15', estimatedDropDate: '17 Aug 2026', estimatedDropTime: '18:30', cargo: { material: 'Cement', company: 'Dalmia Cement', quantity: '28 tonnes', noOfBags: '560 bags', loadType: 'Bagged' }, truck: { number: 'OD 14 AB 4721', type: 'Body', configuration: '12 tyre', brand: 'Tata Motors' }, fuel: { assigned: '120 L', received: '120 L', station: 'Indian Oil, Cuttack Bypass', fulfilledAt: '17 Aug 2026 · 13:35' }, cash: { advance: '₹25,000', paymentMode: 'UPI' }, documents: [{ id: 'doc-1', name: 'DR-1046-LR.pdf', type: 'LR', uploadedAt: '17 Aug 2026 · 13:35' }], extras: [{ id: 'ex-1', type: 'Fuel', amount: '₹8,400', note: 'Refuelled near Cuttack bypass', status: 'Submitted' }] }]
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function OpsDashboard() {
   const [role, setRole] = useState<Role>('Coordinator')
-  const [requests, setRequests] = useState<Request[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
   const [followups, setFollowups] = useState<Followup[]>([])
   const [fuelTransactions, setFuelTransactions] = useState<FuelTransaction[]>([])
@@ -65,222 +157,361 @@ export default function OpsDashboard() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [dbReady, setDbReady] = useState(false)
   const [dbError, setDbError] = useState('')
-  useEffect(() => { fetch('/api/mock-db').then((response) => { if (!response.ok) throw new Error('Mock database unavailable'); return response.json() }).then((data) => { setRequests(data.requests); setTrips(data.trips); setFollowups(data.followups || []); setFuelTransactions(data.fuelTransactions || []); setDrivers(data.drivers || []); setVehicles(data.vehicles || []); setDbReady(true) }).catch(() => setDbError('Unable to load mock database')) }, [])
-  async function persist(collection: 'requests' | 'trips' | 'extras' | 'documents' | 'followups' | 'fuel-transactions' | 'drivers', data: unknown) { const response = await fetch('/api/mock-db', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ collection, data }) }); if (!response.ok) throw new Error('Mock database write failed'); return response.json() }
+
+  useEffect(() => {
+    fetch('/api/mock-db')
+      .then((r) => { if (!r.ok) throw new Error('DB unavailable'); return r.json() })
+      .then((data) => {
+        setTrips(data.trips || [])
+        setFollowups(data.followups || [])
+        setFuelTransactions(data.fuelTransactions || [])
+        setDrivers(data.drivers || [])
+        setVehicles(data.vehicles || [])
+        setDbReady(true)
+      })
+      .catch(() => setDbError('Unable to load mock database'))
+  }, [])
+
+  async function persist(collection: 'trips' | 'extras' | 'documents' | 'followups' | 'fuel-transactions' | 'drivers', data: unknown) {
+    const response = await fetch('/api/mock-db', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ collection, data }) })
+    if (!response.ok) throw new Error('Mock database write failed')
+    return response.json()
+  }
+
   const [view, setView] = useState('dashboard')
-  const [selected, setSelected] = useState<Request | Trip | null>(null)
+  const [selected, setSelected] = useState<Trip | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [showExtra, setShowExtra] = useState(false)
   const [showDocument, setShowDocument] = useState(false)
   const [showFollowup, setShowFollowup] = useState(false)
   const [followupTripFilter, setFollowupTripFilter] = useState('')
-  const [editTarget, setEditTarget] = useState<Request | Trip | null>(null)
-  const [acceptPendingRequest, setAcceptPendingRequest] = useState<Request | null>(null)
+  const [editTarget, setEditTarget] = useState<Trip | null>(null)
+  const [approvePendingTrip, setApprovePendingTrip] = useState<Trip | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [toast, setToast] = useState('')
 
-  const pending = requests.filter((r) => r.status === 'Pending')
-  const accepted = requests.filter((r) => r.status === 'Accepted')
-  const visibleRequests = role === 'Driver' ? [] : requests
-  const visibleTrips = role === 'Driver' ? trips.filter((t) => t.driver === 'Ramesh Yadav') : trips
-  const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2800) }
+  const notify = (msg: string) => { setToast(msg); window.setTimeout(() => setToast(''), 2800) }
 
-  function acceptRequest(request: Request, driverObj?: Driver) {
+  const newCount = trips.filter((t) => t.status === 'NEW').length
+  const visibleTrips = role === 'Driver' ? trips.filter((t) => t.driver === 'Ramesh Yadav') : trips
+
+  // ─── Status Transition Handlers ──────────────────────────────────────────
+
+  function updateTripStatus(tripId: string, status: TripStatus, extra?: Partial<Trip>) {
+    const next = trips.map((t) => t.id === tripId ? { ...t, status, ...extra } : t)
+    setTrips(next)
+    void persist('trips', next)
+    const updated = next.find((t) => t.id === tripId)
+    if (updated) setSelected(updated)
+    return updated
+  }
+
+  // Operations: approve → opens AssignDriverModal
+  function approveTrip(trip: Trip, driverObj?: Driver) {
     const driverName = driverObj?.name
     const driverId = driverObj?.id ?? ''
-    const updated = { ...request, status: 'Accepted' as RequestStatus, driver: driverName, driverNumber: driverId }
     const vehicleRecord = driverObj ? vehicles.find((v) => v.truck_id === driverObj.truck_id) : undefined
-    const nextRequests = requests.map((item) => item.id === request.id ? updated : item)
-    const nextTrips = [...trips.filter((item) => item.id !== request.id), { ...updated, tripStatus: 'Scheduled' as TripStatus, pickupDate: request.date, pickupTime: request.time, estimatedDropDate: request.date, estimatedDropTime: request.time, cargo: { material: request.cargoMaterial || 'Cement', company: request.customer, quantity: request.cargoWeight || '28 tonnes', loadType: (request.cargoType ?? 'Bagged') as 'Bagged' | 'Loose' }, truck: { number: driverObj?.truck_id || 'Pending assignment', type: (vehicleRecord?.type === 'Bulker' ? 'Open' : 'Body') as 'Body' | 'Open', configuration: `${vehicleRecord?.tires_count ?? 12} tyre` as '10 tyre' | '12 tyre' | '14 tyre' | '16 tyre', brand: vehicleRecord?.brand || 'Tata Motors' }, fuel: { assigned: '120 L', received: 'Awaiting receipt', station: 'To be assigned', fulfilledAt: 'Not fulfilled' }, cash: { advance: '₹0', paymentMode: 'UPI' as const }, documents: [], extras: [] }]
-    setRequests(nextRequests)
-    setTrips(nextTrips)
+    const extra: Partial<Trip> = {
+      status: 'APPROVED',
+      driver: driverName ?? trip.driver,
+      driverNumber: driverId || trip.driverNumber,
+      pickupDate: trip.pickupDate || trip.date,
+      pickupTime: trip.pickupTime || trip.time,
+      estimatedDropDate: trip.estimatedDropDate || trip.date,
+      estimatedDropTime: trip.estimatedDropTime || trip.time,
+      cargo: trip.cargo ?? { material: trip.cargoMaterial || 'Cement', company: trip.customer, quantity: trip.cargoWeight || '—', loadType: trip.cargoType ?? 'Bagged' },
+      truck: trip.truck ?? { number: driverObj?.truck_id || 'Pending assignment', type: (vehicleRecord?.type === 'Bulker' ? 'Open' : 'Body') as 'Body' | 'Open', configuration: `${vehicleRecord?.tires_count ?? 12} tyre` as '10 tyre' | '12 tyre' | '14 tyre' | '16 tyre', brand: vehicleRecord?.brand || 'Tata Motors' },
+      fuel: trip.fuel ?? { assigned: '120 L', received: 'Awaiting receipt', station: 'To be assigned', fulfilledAt: 'Not fulfilled' },
+      cash: trip.cash ?? { advance: '₹0', paymentMode: 'UPI' as const },
+    }
+    const next = trips.map((t) => t.id === trip.id ? { ...t, ...extra } : t)
+    setTrips(next)
     if (driverObj) {
       const nextDrivers = drivers.map((d) => d.id === driverObj.id ? { ...d, status: 'unavailable' as const } : d)
       setDrivers(nextDrivers)
       void persist('drivers', nextDrivers)
     }
-    void Promise.all([persist('requests', nextRequests), persist('trips', nextTrips)])
-    setSelected(updated)
-    notify(`${request.reference} accepted${driverObj ? ` · ${driverObj.name} assigned` : ''}`)
+    void persist('trips', next)
+    setSelected(next.find((t) => t.id === trip.id) ?? null)
+    notify(`${trip.reference} approved${driverObj ? ` · ${driverObj.name} assigned` : ''}`)
   }
-  function rejectRequest(request: Request) { const next = requests.map((item) => item.id === request.id ? { ...item, status: 'Rejected' as RequestStatus } : item); setRequests(next); void persist('requests', next); setSelected({ ...request, status: 'Rejected' }); notify(`${request.reference} rejected`) }
-  function addRequest(data: Request) {
-    const next = [data, ...requests]
-    setRequests(next)
-    void persist('requests', next)
+
+  function rejectTripByOps(trip: Trip) { updateTripStatus(trip.id, 'OP_REJECTED'); notify(`${trip.reference} rejected by Operations`) }
+  function acceptTripByDriver(trip: Trip) { updateTripStatus(trip.id, 'ACCEPTED'); notify(`${trip.reference} accepted by driver`) }
+  function rejectTripByDriver(trip: Trip) { updateTripStatus(trip.id, 'DV_REJECTED'); notify(`${trip.reference} rejected by driver`) }
+  function startTrip(trip: Trip) { updateTripStatus(trip.id, 'TRIP_STARTED'); notify(`${trip.reference} — journey started`) }
+  function holdTrip(trip: Trip) { updateTripStatus(trip.id, 'TRIP_ON_HOLD'); notify(`${trip.reference} put on hold`) }
+  function reachTrip(trip: Trip) { updateTripStatus(trip.id, 'REACHED'); notify(`${trip.reference} — driver reached destination`) }
+
+  function addTrip(data: Trip) {
+    const next = [data, ...trips]
+    setTrips(next)
+    void persist('trips', next)
     setShowCreate(false)
-    notify('Trip request created')
+    notify('Trip created')
   }
-  function sendReminder(request: Request) { notify(`Reminder sent to Operations for ${request.reference}`) }
-  async function updateEntity(data: Partial<Request>) { if (!editTarget) return; const updated = { ...editTarget, ...data }; const nextRequests = requests.map((item) => item.id === updated.id ? { ...item, ...data } : item); const nextTrips = trips.map((item) => item.id === updated.id ? { ...item, ...data, pickupDate: data.date || item.pickupDate, pickupTime: data.time || item.pickupTime } : item); setRequests(nextRequests); setTrips(nextTrips); setSelected(updated); await persist('requests', nextRequests); if ('tripStatus' in updated) await persist('trips', nextTrips); setEditTarget(null); notify(`${updated.reference} updated`) }
-  function createFollowup(data: Omit<Followup, 'id' | 'createdAt' | 'status'>) { const now = new Date(); const ts = `${now.getDate()} ${now.toLocaleString('en-GB', { month: 'short' })} ${now.getFullYear()} · ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`; const followup: Followup = { ...data, id: `fu-${Date.now()}`, createdAt: ts, status: 'Open' }; const next = [followup, ...followups]; setFollowups(next); void persist('followups', next); setShowFollowup(false); notify('Follow-up created') }
+
+  function sendReminder(trip: Trip) { notify(`Reminder sent to Operations for ${trip.reference}`) }
+
+  async function updateTrip(data: Partial<Trip>) {
+    if (!editTarget) return
+    const updated = { ...editTarget, ...data }
+    const next = trips.map((t) => t.id === updated.id ? updated : t)
+    setTrips(next)
+    setSelected(updated)
+    await persist('trips', next)
+    setEditTarget(null)
+    notify(`${updated.reference} updated`)
+  }
+
+  function createFollowup(data: Omit<Followup, 'id' | 'createdAt' | 'status'>) {
+    const now = new Date()
+    const ts = `${now.getDate()} ${now.toLocaleString('en-GB', { month: 'short' })} ${now.getFullYear()} · ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`
+    const fu: Followup = { ...data, id: `fu-${Date.now()}`, createdAt: ts, status: 'Open' }
+    const next = [fu, ...followups]
+    setFollowups(next)
+    void persist('followups', next)
+    setShowFollowup(false)
+    notify('Follow-up created')
+  }
+
   function sendToPump(tx: FuelTransaction) { const next = fuelTransactions.map((t) => t.id === tx.id ? { ...t, status: 'Sent' as const } : t); setFuelTransactions(next); void persist('fuel-transactions', next); notify(`Fuel sent to pump for ${tx.tripRef}`) }
   function resendToPump(tx: FuelTransaction) { const next = fuelTransactions.map((t) => t.id === tx.id ? { ...t, status: 'Resent' as const } : t); setFuelTransactions(next); void persist('fuel-transactions', next); notify(`Fuel resent to pump for ${tx.tripRef}`) }
-  async function addExtra(data: Extra) { const tripId = selected?.id; if (!tripId) return; const entity = { ...data, tripId }; const currentExtras = trips.flatMap((trip) => trip.extras.map((extra) => ({ ...extra, tripId: trip.id }))); const nextExtras = [...currentExtras, entity]; const result = await persist('extras', nextExtras); const hydratedTrip = result.trip as Trip | undefined; const nextTrips = trips.map((trip) => trip.id === tripId ? { ...trip, extras: hydratedTrip?.extras || [...trip.extras, data] } : trip); setTrips(nextTrips); setSelected(nextTrips.find((trip) => trip.id === tripId) || selected); setShowExtra(false); notify(`${data.type} request submitted`) }
-  async function addDocument(data: TripDocument) { const tripId = selected?.id; if (!tripId) return; const entity = { ...data, tripId }; const currentDocuments = trips.flatMap((trip) => trip.documents.map((document) => ({ ...document, tripId: trip.id }))); const nextDocuments = [...currentDocuments, entity]; const result = await persist('documents', nextDocuments); const hydratedTrip = result.trip as Trip | undefined; const nextTrips = trips.map((trip) => trip.id === tripId ? { ...trip, documents: hydratedTrip?.documents || [...trip.documents, data] } : trip); setTrips(nextTrips); setSelected(nextTrips.find((trip) => trip.id === tripId) || selected); setShowDocument(false); notify(`${data.type} document uploaded`) }
 
-  const title = view === 'dashboard' ? 'Good morning, Alex' : view === 'requests' || view === 'request-detail' ? 'Trip requests' : view === 'trips' || view === 'trip-detail' ? 'Trips' : view === 'followups' ? 'Follow-ups' : view === 'fuel' ? 'Fuel transactions' : view === 'reports-ops' ? 'Trip Operations Report' : view === 'reports-fuel' ? 'Fuel & Trip Expense Report' : 'Overview'
-  return <div className="app-shell">
-    <aside className="sidebar">
-      <div className="brand"><span className="brand-mark">D</span><span>Dev Roadways</span></div>
-      <div className="workspace">Operations workspace <CaretDown size={14} style={{ display: 'inline', marginLeft: 4 }} /></div>
-      <nav>
-        {role === 'Super Admin' ? (
-          <>
-            <NavItem active={view === 'reports-ops'} label="Trip Operations" onClick={() => setView('reports-ops')} icon={<ChartPie size={18} />} />
-            <NavItem active={view === 'reports-fuel'} label="Fuel & Expenses" onClick={() => setView('reports-fuel')} icon={<GasPump size={18} />} />
-          </>
-        ) : (
-          <>
-            {role !== 'Driver' && (
-              <>
-                <NavItem active={view === 'dashboard'} label="Overview" onClick={() => setView('dashboard')} icon={<House size={18} />} />
-                <NavItem active={view === 'requests'} label="Trip requests" count={pending.length} onClick={() => setView('requests')} icon={<ClipboardText size={18} />} />
-              </>
-            )}
-            <NavItem active={view === 'trips'} label="Trips" onClick={() => setView('trips')} icon={<Truck size={18} />} />
-            {role === 'Operations' && <NavItem active={view === 'followups'} label="Follow-ups" count={followups.filter((f) => f.status === 'Open').length || undefined} onClick={() => setView('followups')} icon={<Clock size={18} />} />}
-            {role !== 'Driver' && <NavItem active={view === 'fuel'} label="Fuel transactions" onClick={() => setView('fuel')} icon={<GasPump size={18} />} />}
-          </>
-        )}
-      </nav>
-      <div className="sidebar-bottom">
-        <div className="help"><QuestionMark size={16} /><span>Help centre</span></div>
-        <div className="profile"><span className="avatar">AC</span><span><b>Alex Cooper</b><small>{role}</small></span><span className="more"><DotsThree size={18} /></span></div>
-      </div>
-    </aside>
+  async function addExtra(data: Extra) {
+    const tripId = selected?.id; if (!tripId) return
+    const entity = { ...data, tripId }
+    const currentExtras = trips.flatMap((t) => t.extras.map((e) => ({ ...e, tripId: t.id })))
+    const nextExtras = [...currentExtras, entity]
+    const result = await persist('extras', nextExtras)
+    const hydratedTrip = result.trip as Trip | undefined
+    const next = trips.map((t) => t.id === tripId ? { ...t, extras: hydratedTrip?.extras || [...t.extras, data] } : t)
+    setTrips(next); setSelected(next.find((t) => t.id === tripId) || selected); setShowExtra(false); notify(`${data.type} request submitted`)
+  }
 
-    <main className="main">
-      <header className="topbar">
-        <button className="mobile-menu" aria-label="Open menu" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}><List size={20} /></button>
-        <div className="crumb">{role === 'Super Admin' ? 'Admin' : 'Operations'} <span>/</span> {view === 'dashboard' ? 'Overview' : title}</div>
-        <div className="top-actions">
-          <button className="icon-button" aria-label="Notifications"><Bell size={18} /></button>
-          <div className="role-switch">
-            <span>Viewing as</span>
-            <select value={role} onChange={(e) => { setRole(e.target.value as Role); setView(e.target.value === 'Driver' ? 'trips' : e.target.value === 'Super Admin' ? 'reports-ops' : 'dashboard') }} aria-label="Select role">
-              <option>Coordinator</option>
-              <option>Operations</option>
-              <option>Driver</option>
-              <option>Super Admin</option>
-            </select>
-          </div>
+  async function addDocument(data: TripDocument) {
+    const tripId = selected?.id; if (!tripId) return
+    const entity = { ...data, tripId }
+    const currentDocuments = trips.flatMap((t) => t.documents.map((d) => ({ ...d, tripId: t.id })))
+    const nextDocuments = [...currentDocuments, entity]
+    const result = await persist('documents', nextDocuments)
+    const hydratedTrip = result.trip as Trip | undefined
+    // If driver uploads a document and trip is ACCEPTED, promote to DOCUMENT_UPLOADED
+    const next = trips.map((t) => {
+      if (t.id !== tripId) return t
+      const updatedDocs = hydratedTrip?.documents || [...t.documents, data]
+      const newStatus: TripStatus = t.status === 'ACCEPTED' ? 'DOCUMENT_UPLOADED' : t.status
+      return { ...t, documents: updatedDocs, status: newStatus }
+    })
+    setTrips(next); setSelected(next.find((t) => t.id === tripId) || selected); setShowDocument(false); notify(`${data.type} document uploaded`)
+  }
+
+  // Complete trip after stamped doc upload (from REACHED)
+  async function uploadStampedDoc(data: TripDocument) {
+    const tripId = selected?.id; if (!tripId) return
+    const entity = { ...data, tripId }
+    const currentDocuments = trips.flatMap((t) => t.documents.map((d) => ({ ...d, tripId: t.id })))
+    const nextDocuments = [...currentDocuments, entity]
+    const result = await persist('documents', nextDocuments)
+    const hydratedTrip = result.trip as Trip | undefined
+    const next = trips.map((t) => {
+      if (t.id !== tripId) return t
+      return { ...t, documents: hydratedTrip?.documents || [...t.documents, data], status: 'TRIP_COMPLETED' as TripStatus }
+    })
+    setTrips(next); setSelected(next.find((t) => t.id === tripId) || selected); setShowDocument(false); notify('Stamped document uploaded — Trip completed!')
+  }
+
+  // ─── Derived ──────────────────────────────────────────────────────────────
+
+  const title = view === 'dashboard' ? 'Good morning, Alex'
+    : view === 'trips' || view === 'trip-detail' ? 'Trips'
+    : view === 'followups' ? 'Follow-ups'
+    : view === 'fuel' ? 'Fuel transactions'
+    : view === 'reports-ops' ? 'Trip Operations Report'
+    : view === 'reports-fuel' ? 'Fuel & Trip Expense Report'
+    : 'Overview'
+
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="brand"><span className="brand-mark">D</span><span>Dev Roadways</span></div>
+        <div className="workspace">Operations workspace <CaretDown size={14} style={{ display: 'inline', marginLeft: 4 }} /></div>
+        <nav>
+          {role === 'Super Admin' ? (
+            <>
+              <NavItem active={view === 'reports-ops'} label="Trip Operations" onClick={() => setView('reports-ops')} icon={<ChartPie size={18} />} />
+              <NavItem active={view === 'reports-fuel'} label="Fuel &amp; Expenses" onClick={() => setView('reports-fuel')} icon={<GasPump size={18} />} />
+            </>
+          ) : (
+            <>
+              {role !== 'Driver' && <NavItem active={view === 'dashboard'} label="Overview" onClick={() => setView('dashboard')} icon={<House size={18} />} />}
+              <NavItem active={view === 'trips'} label="Trips" count={newCount || undefined} onClick={() => setView('trips')} icon={<Truck size={18} />} />
+              {role === 'Operations' && <NavItem active={view === 'followups'} label="Follow-ups" count={followups.filter((f) => f.status === 'Open').length || undefined} onClick={() => setView('followups')} icon={<Clock size={18} />} />}
+              {role !== 'Driver' && <NavItem active={view === 'fuel'} label="Fuel transactions" onClick={() => setView('fuel')} icon={<GasPump size={18} />} />}
+            </>
+          )}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="help"><QuestionMark size={16} /><span>Help centre</span></div>
+          <div className="profile"><span className="avatar">AC</span><span><b>Alex Cooper</b><small>{role}</small></span><span className="more"><DotsThree size={18} /></span></div>
         </div>
-      </header>
+      </aside>
 
-      <div className="content">
-        {!dbReady && !dbError && <div className="panel db-state">Loading mock database…</div>}
-        {dbError && <div className="panel db-state error">{dbError}</div>}
-        {dbReady && (
-          <>
-            <div className="page-heading">
-              <div>
-                <h1>{title}</h1>
-                {view === 'dashboard' && <p className="subheading">Keep every journey moving, from request to arrival.</p>}
-              </div>
-              {role === 'Coordinator' && view === 'dashboard' && (
-                <div className="heading-actions">
-                  <button className="button secondary" onClick={() => setShowImport(true)}><UploadSimple size={16} style={{ display: 'inline', marginRight: 6 }} /><span>Import Excel</span></button>
-                  <button className="button primary" onClick={() => setShowCreate(true)}><Plus size={16} style={{ display: 'inline', marginRight: 6 }} /><span>New request</span></button>
-                </div>
-              )}
+      <main className="main">
+        <header className="topbar">
+          <button className="mobile-menu" aria-label="Open menu" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}><List size={20} /></button>
+          <div className="crumb">{role === 'Super Admin' ? 'Admin' : 'Operations'} <span>/</span> {view === 'dashboard' ? 'Overview' : title}</div>
+          <div className="top-actions">
+            <button className="icon-button" aria-label="Notifications"><Bell size={18} /></button>
+            <div className="role-switch">
+              <span>Viewing as</span>
+              <select value={role} onChange={(e) => { setRole(e.target.value as Role); setView(e.target.value === 'Driver' ? 'trips' : e.target.value === 'Super Admin' ? 'reports-ops' : 'dashboard') }} aria-label="Select role">
+                <option>Coordinator</option>
+                <option>Operations</option>
+                <option>Driver</option>
+                <option>Super Admin</option>
+              </select>
             </div>
-
-            {view === 'dashboard' && role !== 'Driver' && <Dashboard pending={pending} accepted={accepted} requests={requests} trips={trips} onOpen={(r) => { setSelected(r); setView('request-detail') }} onOpenTrip={(t) => { setSelected(t); setView('trip-detail') }} onViewAll={() => setView('trips')} onViewAllRequests={() => setView('requests')} />}
-            {view === 'requests' && role !== 'Driver' && <RequestList requests={visibleRequests} onOpen={(r) => { setSelected(r); setView('request-detail') }} onCreate={() => setShowCreate(true)} onImport={() => setShowImport(true)} />}
-            {view === 'request-detail' && selected && <RequestDetail request={selected as Request} role={role} drivers={drivers} vehicles={vehicles} onBack={() => setView('requests')} onAccept={(r) => setAcceptPendingRequest(r)} onReject={rejectRequest} onReminder={() => sendReminder(selected as Request)} onEdit={() => { if (role !== 'Driver') setEditTarget(selected as Request) }} />}
-            {view === 'trips' && <TripList trips={visibleTrips} onOpen={(t) => { setSelected(t); setView('trip-detail') }} />}
-            {view === 'trip-detail' && selected && <><TripDetail trip={selected as Trip} role={role} onBack={() => setView('trips')} onExtra={() => setShowExtra(true)} onDocument={() => setShowDocument(true)} onEdit={() => { if (role !== 'Driver') setEditTarget(selected as Trip) }} onFollowup={role === 'Operations' ? () => { setFollowupTripFilter((selected as Trip).reference); setView('followups') } : undefined} /></>}
-            {view === 'followups' && role === 'Operations' && <FollowupsPage followups={followups} trips={trips} defaultTripFilter={followupTripFilter} onClearDefaultFilter={() => setFollowupTripFilter('')} onCall={(fu) => { window.location.href = `tel:${fu.driverPhone}` }} onOpenTrip={(tripId) => { const t = trips.find((x) => x.id === tripId); if (t) { setSelected(t); setView('trip-detail') } }} onCreate={() => setShowFollowup(true)} />}
-            {view === 'fuel' && role !== 'Driver' && <FuelTransactionsPage transactions={fuelTransactions} onSendToPump={sendToPump} onResend={resendToPump} />}
-            {view === 'reports-ops' && <TripOpsReport trips={trips} />}
-            {view === 'reports-fuel' && <FuelExpenseReport trips={trips} />}
-          </>
-        )}
-      </div>
-    </main>
-
-    {mobileNavOpen && (
-      <div className="mobile-nav-layer" role="presentation" onClick={() => setMobileNavOpen(false)}>
-        <aside className="mobile-drawer" role="dialog" aria-label="Mobile navigation" onClick={(event) => event.stopPropagation()}>
-          <div className="mobile-drawer-header">
-            <div className="brand"><span className="brand-mark">D</span><span>Dev Roadways</span></div>
-            <button className="drawer-close" aria-label="Close menu" onClick={() => setMobileNavOpen(false)}><X size={18} /></button>
           </div>
-          <div className="workspace">Operations workspace <CaretDown size={14} style={{ display: 'inline', marginLeft: 4 }} /></div>
-          <nav>
-            {role === 'Super Admin' ? (
-              <>
-                <NavItem active={view === 'reports-ops'} label="Trip Operations" onClick={() => { setView('reports-ops'); setMobileNavOpen(false) }} icon={<ChartPie size={18} />} />
-                <NavItem active={view === 'reports-fuel'} label="Fuel & Expenses" onClick={() => { setView('reports-fuel'); setMobileNavOpen(false) }} icon={<GasPump size={18} />} />
-              </>
-            ) : (
-              <>
-                {role !== 'Driver' && (
-                  <>
-                    <NavItem active={view === 'dashboard'} label="Overview" onClick={() => { setView('dashboard'); setMobileNavOpen(false) }} icon={<House size={18} />} />
-                    <NavItem active={view === 'requests'} label="Trip requests" count={pending.length} onClick={() => { setView('requests'); setMobileNavOpen(false) }} icon={<ClipboardText size={18} />} />
-                  </>
+        </header>
+
+        <div className="content">
+          {!dbReady && !dbError && <div className="panel db-state">Loading mock database…</div>}
+          {dbError && <div className="panel db-state error">{dbError}</div>}
+          {dbReady && (
+            <>
+              <div className="page-heading">
+                <div>
+                  <h1>{title}</h1>
+                  {view === 'dashboard' && <p className="subheading">Keep every journey moving, from request to arrival.</p>}
+                </div>
+                {role === 'Coordinator' && (view === 'dashboard' || view === 'trips') && (
+                  <div className="heading-actions">
+                    <button className="button secondary" onClick={() => setShowImport(true)}><UploadSimple size={16} style={{ display: 'inline', marginRight: 6 }} /><span>Import Excel</span></button>
+                    <button className="button primary" onClick={() => setShowCreate(true)}><Plus size={16} style={{ display: 'inline', marginRight: 6 }} /><span>New trip</span></button>
+                  </div>
                 )}
-                <NavItem active={view === 'trips'} label="Trips" onClick={() => { setView('trips'); setMobileNavOpen(false) }} icon={<Truck size={18} />} />
-                {role === 'Operations' && <NavItem active={view === 'followups'} label="Follow-ups" count={followups.filter((f) => f.status === 'Open').length || undefined} onClick={() => { setView('followups'); setMobileNavOpen(false) }} icon={<Clock size={18} />} />}
-                {role !== 'Driver' && <NavItem active={view === 'fuel'} label="Fuel transactions" onClick={() => { setView('fuel'); setMobileNavOpen(false) }} icon={<GasPump size={18} />} />}
-              </>
-            )}
-          </nav>
-          <div className="mobile-drawer-footer">
-            <div className="help"><QuestionMark size={16} /><span>Help centre</span></div>
-            <div className="profile"><span className="avatar">AC</span><span><b>Alex Cooper</b><small>{role}</small></span></div>
-          </div>
-        </aside>
-      </div>
-    )}
+              </div>
 
-    {toast && <div className="toast"><Check size={16} style={{ display: 'inline', marginRight: 6, color: '#10b981' }} /> {toast}</div>}
-    {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreate={addRequest} />}
-    {showImport && <ImportModal onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); notify('Excel preview validated — 2 requests ready') }} />}
-    {showExtra && <ExtraModal onClose={() => setShowExtra(false)} onCreate={addExtra} />}
-    {showDocument && <DocumentModal onClose={() => setShowDocument(false)} onCreate={addDocument} />}
-    {showFollowup && <FollowupModal trips={trips} onClose={() => setShowFollowup(false)} onCreate={createFollowup} />}
-    {editTarget && <EditModal entity={editTarget} drivers={drivers} vehicles={vehicles} role={role} onClose={() => setEditTarget(null)} onSave={updateEntity} />}
-    {acceptPendingRequest && <AssignDriverModal request={acceptPendingRequest} drivers={drivers} vehicles={vehicles} onClose={() => setAcceptPendingRequest(null)} onConfirm={(driver) => { void acceptRequest(acceptPendingRequest, driver); setAcceptPendingRequest(null) }} />}
-  </div>
+              {view === 'dashboard' && role !== 'Driver' && (
+                <Dashboard trips={trips} onOpenTrip={(t) => { setSelected(t); setView('trip-detail') }} onViewAll={() => setView('trips')} />
+              )}
+              {view === 'trips' && (
+                <TripList trips={visibleTrips} role={role} onOpen={(t) => { setSelected(t); setView('trip-detail') }} onCreate={() => setShowCreate(true)} onImport={() => setShowImport(true)} />
+              )}
+              {view === 'trip-detail' && selected && (
+                <TripDetail
+                  trip={selected}
+                  role={role}
+                  onBack={() => setView('trips')}
+                  onExtra={() => setShowExtra(true)}
+                  onDocument={() => setShowDocument(true)}
+                  onEdit={() => { if (role !== 'Driver') setEditTarget(selected) }}
+                  onFollowup={role === 'Operations' ? () => { setFollowupTripFilter(selected.reference); setView('followups') } : undefined}
+                  onApprove={(t) => setApprovePendingTrip(t)}
+                  onOpsReject={rejectTripByOps}
+                  onAccept={acceptTripByDriver}
+                  onDvReject={rejectTripByDriver}
+                  onStart={startTrip}
+                  onHold={holdTrip}
+                  onReach={reachTrip}
+                  onUploadStamped={() => setShowDocument(true)}
+                  onReminder={() => sendReminder(selected)}
+                />
+              )}
+              {view === 'followups' && role === 'Operations' && (
+                <FollowupsPage followups={followups} trips={trips} defaultTripFilter={followupTripFilter} onClearDefaultFilter={() => setFollowupTripFilter('')} onCall={(fu) => { window.location.href = `tel:${fu.driverPhone}` }} onOpenTrip={(tripId) => { const t = trips.find((x) => x.id === tripId); if (t) { setSelected(t); setView('trip-detail') } }} onCreate={() => setShowFollowup(true)} />
+              )}
+              {view === 'fuel' && role !== 'Driver' && <FuelTransactionsPage transactions={fuelTransactions} onSendToPump={sendToPump} onResend={resendToPump} />}
+              {view === 'reports-ops' && <TripOpsReport trips={trips} />}
+              {view === 'reports-fuel' && <FuelExpenseReport trips={trips} />}
+            </>
+          )}
+        </div>
+      </main>
+
+      {/* Mobile nav */}
+      {mobileNavOpen && (
+        <div className="mobile-nav-layer" role="presentation" onClick={() => setMobileNavOpen(false)}>
+          <aside className="mobile-drawer" role="dialog" aria-label="Mobile navigation" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-drawer-header">
+              <div className="brand"><span className="brand-mark">D</span><span>Dev Roadways</span></div>
+              <button className="drawer-close" aria-label="Close menu" onClick={() => setMobileNavOpen(false)}><X size={18} /></button>
+            </div>
+            <div className="workspace">Operations workspace <CaretDown size={14} style={{ display: 'inline', marginLeft: 4 }} /></div>
+            <nav>
+              {role === 'Super Admin' ? (
+                <>
+                  <NavItem active={view === 'reports-ops'} label="Trip Operations" onClick={() => { setView('reports-ops'); setMobileNavOpen(false) }} icon={<ChartPie size={18} />} />
+                  <NavItem active={view === 'reports-fuel'} label="Fuel &amp; Expenses" onClick={() => { setView('reports-fuel'); setMobileNavOpen(false) }} icon={<GasPump size={18} />} />
+                </>
+              ) : (
+                <>
+                  {role !== 'Driver' && <NavItem active={view === 'dashboard'} label="Overview" onClick={() => { setView('dashboard'); setMobileNavOpen(false) }} icon={<House size={18} />} />}
+                  <NavItem active={view === 'trips'} label="Trips" count={newCount || undefined} onClick={() => { setView('trips'); setMobileNavOpen(false) }} icon={<Truck size={18} />} />
+                  {role === 'Operations' && <NavItem active={view === 'followups'} label="Follow-ups" count={followups.filter((f) => f.status === 'Open').length || undefined} onClick={() => { setView('followups'); setMobileNavOpen(false) }} icon={<Clock size={18} />} />}
+                  {role !== 'Driver' && <NavItem active={view === 'fuel'} label="Fuel transactions" onClick={() => { setView('fuel'); setMobileNavOpen(false) }} icon={<GasPump size={18} />} />}
+                </>
+              )}
+            </nav>
+            <div className="mobile-drawer-footer">
+              <div className="help"><QuestionMark size={16} /><span>Help centre</span></div>
+              <div className="profile"><span className="avatar">AC</span><span><b>Alex Cooper</b><small>{role}</small></span></div>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {toast && <div className="toast"><Check size={16} style={{ display: 'inline', marginRight: 6, color: '#10b981' }} /> {toast}</div>}
+      {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreate={addTrip} />}
+      {showImport && <ImportModal onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); notify('Excel preview validated — 2 trips ready') }} />}
+      {showExtra && <ExtraModal onClose={() => setShowExtra(false)} onCreate={addExtra} />}
+      {showDocument && selected?.status === 'REACHED'
+        ? <DocumentModal onClose={() => setShowDocument(false)} onCreate={uploadStampedDoc} isStamped />
+        : showDocument && <DocumentModal onClose={() => setShowDocument(false)} onCreate={addDocument} />}
+      {showFollowup && <FollowupModal trips={trips} onClose={() => setShowFollowup(false)} onCreate={createFollowup} />}
+      {editTarget && <EditModal entity={editTarget} drivers={drivers} vehicles={vehicles} role={role} onClose={() => setEditTarget(null)} onSave={updateTrip} />}
+      {approvePendingTrip && <AssignDriverModal trip={approvePendingTrip} drivers={drivers} vehicles={vehicles} onClose={() => setApprovePendingTrip(null)} onConfirm={(driver) => { approveTrip(approvePendingTrip, driver); setApprovePendingTrip(null) }} />}
+    </div>
+  )
 }
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function NavItem({ label, icon, count, active, onClick }: { label: string; icon: React.ReactNode; count?: number; active?: boolean; onClick: () => void }) {
   return <button className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}><span style={{ display: 'inline-flex', alignItems: 'center' }}>{icon}</span>{label}{count ? <em>{count}</em> : null}</button>
 }
 
-function Status({ children }: { children: string }) {
-  return <span className={`status ${children.toLowerCase().replace(' ', '-')}`}>{children}</span>
+function StatusBadge({ status }: { status: string }) {
+  const { bg, color } = getStatusColors(status)
+  return <span className="status" style={{ background: bg, color }}>{getStatusLabel(status)}</span>
 }
 
-function Dashboard({ pending, accepted, requests, trips, onOpen, onOpenTrip, onViewAll, onViewAllRequests }: { pending: Request[]; accepted: Request[]; requests: Request[]; trips: Trip[]; onOpen: (r: Request) => void; onOpenTrip: (t: Trip) => void; onViewAll: () => void; onViewAllRequests: () => void }) {
-  const recentTrips = [...trips].sort((a, b) => b.date.localeCompare(a.date));
-  const recentRequests = [...requests].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 1);
+// Legacy Status component for compatibility (used by followups, fuel etc.)
+function Status({ children }: { children: string }) {
+  return <span className={`status ${children.toLowerCase().replace(/\s+/g, '-')}`}>{children}</span>
+}
+
+function Dashboard({ trips, onOpenTrip, onViewAll }: { trips: Trip[]; onOpenTrip: (t: Trip) => void; onViewAll: () => void }) {
+  const newTrips = trips.filter((t) => t.status === 'NEW')
+  const activeTrips = trips.filter((t) => ['TRIP_STARTED', 'TRIP_ON_HOLD'].includes(t.status))
+  const recentTrips = [...trips].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5)
+
   return (
     <>
       <section className="stats">
-        <Stat label="Pending requests" value={pending.length} tone="blue" hint="Needs review" icon={<Clock size={18} />} />
-        <Stat label="Trips this week" value={accepted.length + 2} tone="green" hint="Across all drivers" icon={<Truck size={18} />} />
-        <Stat label="Active trips" value={trips.filter((t) => t.tripStatus === 'In progress').length} tone="purple" hint="Currently moving" icon={<ClipboardText size={18} />} />
+        <Stat label="New trips" value={newTrips.length} tone="blue" hint="Awaiting review" icon={<Clock size={18} />} />
+        <Stat label="Active trips" value={activeTrips.length} tone="purple" hint="Currently moving" icon={<Truck size={18} />} />
+        <Stat label="Total trips" value={trips.length} tone="green" hint="All time" icon={<ChartPie size={18} />} />
       </section>
       <section className="section-grid">
-        <div className="panel">
+        <div className="panel" style={{ gridColumn: 'span 2' }}>
           <div className="panel-header">
-            <div><h2>Trip requests</h2><p>Requests awaiting review or action.</p></div>
-            <button className="text-button" onClick={onViewAllRequests}>View all <ArrowRight size={14} style={{ display: 'inline', marginLeft: 2 }} /></button>
-          </div>
-          <div className="request-stack">{recentRequests.map((request) => <RequestCard key={request.id} request={request} onClick={() => onOpen(request)} />)}</div>
-          {!recentRequests.length && <Empty label="No trip requests yet" />}
-        </div>
-        <div className="panel">
-          <div className="panel-header">
-            <div><h2>Trips</h2><p>Recently created and scheduled journeys.</p></div>
+            <div><h2>All Trips</h2><p>Recently created and scheduled journeys.</p></div>
             <button className="text-button" onClick={onViewAll}>View all <ArrowRight size={14} style={{ display: 'inline', marginLeft: 2 }} /></button>
           </div>
-          <div className="request-stack">{recentTrips.map((trip) => <TripRow key={trip.id} trip={trip} onClick={() => onOpenTrip(trip)} />)}</div>
+          <div className="request-stack">{recentTrips.map((t) => <TripRow key={t.id} trip={t} onClick={() => onOpenTrip(t)} />)}</div>
           {!recentTrips.length && <Empty label="No trips yet" />}
         </div>
       </section>
@@ -292,11 +523,7 @@ function Stat({ label, value, hint, tone, icon }: { label: string; value: string
   return (
     <div className="stat">
       {icon && <span className={`stat-icon ${tone}`}>{icon}</span>}
-      <div>
-        <p>{label}</p>
-        <strong>{value}</strong>
-        <small>{hint}</small>
-      </div>
+      <div><p>{label}</p><strong>{value}</strong><small>{hint}</small></div>
     </div>
   )
 }
@@ -306,158 +533,71 @@ function TripRow({ trip, onClick }: { trip: Trip; onClick: () => void }) {
     <button className="trip-card" onClick={onClick}>
       <span className="trip-date"><b>{trip.date.split(' ')[0]}</b><small>{trip.date.split(' ')[1]}</small></span>
       <span className="request-main"><b>{trip.reference} · {trip.customer}</b><small>{trip.origin} <ArrowRight size={12} style={{ display: 'inline', margin: '0 2px', color: '#a4adba' }} /> {trip.destination}</small></span>
-      <Status>{trip.tripStatus}</Status>
+      <StatusBadge status={trip.status} />
       <span className="chevron"><CaretRight size={16} /></span>
     </button>
   )
 }
 
-function RequestRow({ request, onClick }: { request: Request; onClick: () => void }) {
-  return (
-    <button className="request-row" onClick={onClick}>
-      <span className="request-icon"><ArrowRight size={16} /></span>
-      <span className="request-main"><b>{request.reference}</b><small>{request.origin} <ArrowRight size={12} style={{ display: 'inline', margin: '0 2px', color: '#a4adba' }} /> {request.destination}</small></span>
-      <span className="request-date"><b>{request.date}</b><small>{request.time} · {request.passengers} passengers</small></span>
-      <Status>{request.status}</Status>
-      <span className="chevron"><CaretRight size={16} /></span>
-    </button>
-  )
-}
+function TripList({ trips, role, onOpen, onCreate, onImport }: { trips: Trip[]; role: Role; onOpen: (t: Trip) => void; onCreate: () => void; onImport: () => void }) {
+  const [filter, setFilter] = useState('All')
+  const [query, setQuery] = useState('')
 
-function RequestCard({ request, onClick }: { request: Request; onClick: () => void }) {
-  return (
-    <button className="request-card" onClick={onClick}>
-      <span className="request-icon"><ArrowRight size={16} /></span>
-      <span className="request-main"><b>{request.reference} · {request.customer}</b><small>{request.origin} <ArrowRight size={12} style={{ display: 'inline', margin: '0 2px', color: '#a4adba' }} /> {request.destination}</small><small>{request.date} · {request.time} · {request.passengers} bags</small></span>
-      <Status>{request.status}</Status>
-      <span className="chevron"><CaretRight size={16} /></span>
-    </button>
-  )
-}
+  const FILTER_GROUPS: Record<string, TripStatus[]> = {
+    New: ['NEW'],
+    Approved: ['APPROVED', 'ACCEPTED', 'DOCUMENT_UPLOADED'],
+    Active: ['TRIP_STARTED', 'TRIP_ON_HOLD', 'REACHED'],
+    Completed: ['TRIP_COMPLETED'],
+    Rejected: ['OP_REJECTED', 'DV_REJECTED'],
+  }
 
-function RequestList({ requests, onOpen, onCreate, onImport }: { requests: Request[]; onOpen: (r: Request) => void; onCreate: () => void; onImport: () => void }) {
-  const [filter, setFilter] = useState('All');
-  const [query, setQuery] = useState('');
-  const filtered = requests.filter((r) => (filter === 'All' || r.status === filter) && `${r.reference} ${r.customer} ${r.origin} ${r.destination}`.toLowerCase().includes(query.toLowerCase()));
+  const filtered = trips.filter((t) => {
+    const matchesFilter = filter === 'All' || (FILTER_GROUPS[filter]?.includes(t.status) ?? false)
+    const matchesQuery = `${t.reference} ${t.customer} ${t.origin} ${t.destination}`.toLowerCase().includes(query.toLowerCase())
+    return matchesFilter && matchesQuery
+  })
+
   return (
     <section className="panel list-panel">
       <div className="panel-header">
-        <div><h2>All requests</h2></div>
-        <div className="panel-header-actions">
-          <button className="icon-create" aria-label="Upload Excel" title="Upload Excel" onClick={onImport}><UploadSimple size={16} /></button>
-          <button className="icon-create" aria-label="New request" title="New request" onClick={onCreate}><Plus size={16} /></button>
-        </div>
+        <div><h2>{trips.length} trips</h2></div>
+        {role === 'Coordinator' && (
+          <div className="panel-header-actions">
+            <button className="icon-create" aria-label="Import Excel" title="Import Excel" onClick={onImport}><UploadSimple size={16} /></button>
+            <button className="icon-create" aria-label="New trip" title="New trip" onClick={onCreate}><Plus size={16} /></button>
+          </div>
+        )}
       </div>
       <div className="filters">
         <div className="search"><MagnifyingGlass size={16} style={{ color: '#9ca6b4', marginRight: 4 }} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search reference or customer" /></div>
-        <div className="filter-group">{['All', 'Pending', 'Accepted', 'Rejected'].map((f) => <button key={f} className={filter === f ? 'filter active' : 'filter'} onClick={() => setFilter(f)}>{f}</button>)}</div>
+        <div className="filter-group">{['All', 'New', 'Approved', 'Active', 'Completed', 'Rejected'].map((f) => <button key={f} className={filter === f ? 'filter active' : 'filter'} onClick={() => setFilter(f)}>{f}</button>)}</div>
       </div>
-      {filtered.map((r) => <div key={r.id}><RequestCard request={r} onClick={() => onOpen(r)} /></div>)}
+      {filtered.map((t) => <div key={t.id}><TripRow trip={t} onClick={() => onOpen(t)} /></div>)}
+      {!filtered.length && <Empty label="No trips match" />}
     </section>
   )
 }
 
-function RequestDetail({ request, role, drivers, vehicles, onBack, onAccept, onReject, onReminder, onEdit }: { request: Request; role: Role; drivers: Driver[]; vehicles: Vehicle[]; onBack: () => void; onAccept: (r: Request) => void; onReject: (r: Request) => void; onReminder: () => void; onEdit: () => void }) {
-  // Only Operations can see driver/truck details
-  const canSeeDriver = role !== 'Coordinator'
-  const driverRecord = canSeeDriver ? (drivers.find((d) => d.id === request.driverNumber) ?? null) : null
-  const vehicleRecord = driverRecord ? (vehicles.find((v) => v.truck_id === driverRecord.truck_id) ?? null) : null
+function TripDetail({
+  trip, role, onBack, onExtra, onDocument, onEdit, onFollowup,
+  onApprove, onOpsReject, onAccept, onDvReject, onStart, onHold, onReach, onUploadStamped, onReminder,
+}: {
+  trip: Trip; role: Role;
+  onBack: () => void; onExtra: () => void; onDocument: () => void; onEdit: () => void; onFollowup?: () => void;
+  onApprove: (t: Trip) => void; onOpsReject: (t: Trip) => void;
+  onAccept: (t: Trip) => void; onDvReject: (t: Trip) => void;
+  onStart: (t: Trip) => void; onHold: (t: Trip) => void; onReach: (t: Trip) => void;
+  onUploadStamped: () => void; onReminder: () => void;
+}) {
+  const isPendingReview = trip.status === 'NEW'
 
-  return (
-    <section className="detail">
-      <button className="back" onClick={onBack}><ArrowLeft size={16} style={{ display: 'inline', marginRight: 4 }} /> Back to requests</button>
-      <div className="detail-heading">
-        <div><p className="eyebrow">Trip request</p><h1>{request.reference}</h1><p className="subheading">{request.customer} · Created {request.createdAt}</p></div>
-        <div className="detail-heading-right"><button className="quick-action-icon" aria-label="Edit request" title="Edit request" onClick={onEdit}><PencilSimple size={16} /></button><Status>{request.status}</Status></div>
-      </div>
-      <div className="detail-grid">
-        <div className="panel">
-          <h2>Journey details</h2>
-          <div className="journey journey-times">
-            <div><small>Pickup</small><b>{request.origin}</b><span><em>Requested</em><b>{request.date}</b><b>{to12Hour(request.time)}</b></span></div>
-            <ArrowRight size={18} style={{ color: 'var(--blue)', marginTop: 20 }} />
-            <div><small>Drop-off</small><b>{request.destination}</b><span><em>Requested delivery</em><b>{request.requestedDeliveryDate || request.date}</b><b>{to12Hour(request.requestedDeliveryTime || request.time)}</b></span></div>
-          </div>
-          <div className="info-grid">
-            <Info label="Customer" value={request.customer} />
-            <Info label="No. of bags" value={request.noOfBags || `${request.passengers} bags`} />
-            <Info label="Requested delivery" value={`${request.requestedDeliveryDate || request.date} · ${to12Hour(request.requestedDeliveryTime || request.time)}`} />
-            <Info label="Reference" value={request.reference} />
-            <Info label="Material" value={request.cargoMaterial || 'Cement'} />
-            <Info label="Cargo weight" value={request.cargoWeight || '—'} />
-            <Info label="Cargo type" value={request.cargoType || 'Bagged'} />
-          </div>
-          {role === 'Coordinator' && request.status !== 'Accepted' && <button className="button secondary wide" onClick={onReminder}>Send reminder to Operations</button>}
-        </div>
-
-        {/* Operations: review panel — Accept opens the AssignDriverModal */}
-        {role === 'Operations' && request.status === 'Pending' && (
-          <div className="panel action-panel">
-            <h2 style={{ marginBottom: 12 }}>Review</h2>
-            <p style={{ fontSize: 12, color: 'var(--muted-ink)', marginBottom: 14 }}>Accept to proceed to driver assignment, or reject the request.</p>
-            <button className="button primary wide" onClick={() => onAccept(request)}>Accept request</button>
-            <button className="button danger wide" onClick={() => onReject(request)}>Reject request</button>
-          </div>
-        )}
-
-        {/* Assigned driver — visible to Operations only, after approval */}
-        {canSeeDriver && request.status === 'Accepted' && request.driver && (
-          <div className="panel action-panel">
-            <h2 style={{ marginBottom: 12 }}>Assigned driver</h2>
-            <div className="assigned" style={{ marginBottom: 12 }}>
-              <span>
-                <b style={{ fontSize: 13 }}>{driverRecord?.name ?? request.driver}</b>
-                <small style={{ display: 'block', marginTop: 2 }}>{driverRecord ? driverRecord.phone_number : request.driverNumber}</small>
-              </span>
-            </div>
-            {driverRecord && (
-              <div className="info-grid compact-grid">
-                <Info label="Driver ID" value={driverRecord.id} />
-                <Info label="Truck ID" value={driverRecord.truck_id} />
-                <Info label="Base location" value={driverRecord.source_location} />
-                <Info label="Status" value={driverRecord.status === 'unavailable' ? 'On trip' : 'Available'} />
-              </div>
-            )}
-            {!driverRecord && <Info label="Driver ID" value={request.driverNumber ?? '—'} />}
-          </div>
-        )}
-
-        {/* Assigned truck — visible to Operations only, after approval */}
-        {canSeeDriver && request.status === 'Accepted' && vehicleRecord && (
-          <div className="panel action-panel">
-            <h2 style={{ marginBottom: 12 }}>Assigned truck</h2>
-            <div style={{ marginBottom: 12 }}>
-              <b style={{ fontSize: 13 }}>{vehicleRecord.brand} {vehicleRecord.model_name}</b>
-              <small style={{ display: 'block', color: 'var(--muted-ink)', marginTop: 2 }}>{vehicleRecord.truck_id}</small>
-            </div>
-            <div className="info-grid compact-grid">
-              <Info label="Type" value={vehicleRecord.type} />
-              <Info label="Tyres" value={`${vehicleRecord.tires_count} tyres`} />
-              <Info label="Load capacity" value={vehicleRecord.load_capacity} />
-              <Info label="Mileage" value={`${vehicleRecord.mileage_kmpl} km/L`} />
-              <Info label="BS6 compliant" value={vehicleRecord.BS6 === 'yes' ? 'Yes' : 'No'} />
-            </div>
-          </div>
-        )}
-      </div>
-    </section>
-  )
-}
-
-function to12Hour(time: string) { const [hours, minutes] = time.split(':').map(Number); if (Number.isNaN(hours) || Number.isNaN(minutes)) return time; const suffix = hours >= 12 ? 'PM' : 'AM'; const hour = hours % 12 || 12; return `${hour}:${String(minutes).padStart(2, '0')} ${suffix}` }
-function toDatetimeLocal(date: string, time: string): string { try { const months: Record<string, number> = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 }; const parts = date.trim().split(' '); if (parts.length === 3) { const d = new Date(Number(parts[2]), months[parts[1]] ?? 0, Number(parts[0]), Number(time.split(':')[0] || '0'), Number(time.split(':')[1] || '0')); if (!isNaN(d.getTime())) return `${parts[2]}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` } return '' } catch { return '' } }
-function fromDatetimeLocal(value: string): { date: string; time: string } { if (!value) return { date: '', time: '' }; const d = new Date(value); const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']; return { date: `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`, time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` } }
-function Info({ label, value }: { label: string; value: string }) { return <div><small>{label}</small><b>{value}</b></div> }
-function TripList({ trips, onOpen }: { trips: Trip[]; onOpen: (t: Trip) => void }) { return <section className="panel list-panel"><div className="panel-header"><div><h2>{trips.length} trips</h2></div></div>{trips.map((t) => <div key={t.id}><TripRow trip={t} onClick={() => onOpen(t)} /></div>)}{!trips.length && <Empty label="No trips assigned to you" />}</section> }
-
-function TripDetail({ trip, role, onBack, onExtra, onDocument, onEdit, onFollowup }: { trip: Trip; role: Role; onBack: () => void; onExtra: () => void; onDocument: () => void; onEdit: () => void; onFollowup?: () => void }) {
   return (
     <section className="detail">
       <button className="back" onClick={onBack}><ArrowLeft size={16} style={{ display: 'inline', marginRight: 4 }} /> Back to trips</button>
       <div className="detail-heading">
-        <div><p className="eyebrow">Trip details</p><h1>{trip.reference}</h1><p className="subheading">{trip.customer} · Created {trip.createdAt}</p></div>
+        <div><p className="eyebrow">Trip</p><h1>{trip.reference}</h1><p className="subheading">{trip.customer} · Created {trip.createdAt}</p></div>
         <div className="detail-heading-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-          <Status>{trip.tripStatus}</Status>
+          <StatusBadge status={trip.status} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {role === 'Operations' && onFollowup && <button className="button secondary compact" onClick={onFollowup} style={{ height: 32 }}><span>Followups</span></button>}
             {(role === 'Coordinator' || role === 'Operations') && <button className="quick-action-icon" aria-label="Edit trip" title="Edit trip" onClick={onEdit} style={{ width: 32, height: 32 }}><PencilSimple size={16} /></button>}
@@ -465,31 +605,88 @@ function TripDetail({ trip, role, onBack, onExtra, onDocument, onEdit, onFollowu
           </div>
         </div>
       </div>
+
       <div className="detail-grid">
-        <div className="panel" style={{ gridColumn: role === 'Operations' ? 'span 2' : undefined }}>
+        <div className="panel" style={{ gridColumn: (role === 'Operations' || isPendingReview) ? 'span 2' : undefined }}>
           <h2>Journey</h2>
           <div className="journey journey-times">
-            <div><small>Pickup</small><b>{trip.origin}</b><span><em>Scheduled</em><b>{trip.pickupDate}</b><b>{to12Hour(trip.pickupTime)}</b></span><span><em>Actual</em><b>{trip.pickupDate}</b><b>{to12Hour(trip.pickupTime)}</b></span></div>
+            <div><small>Pickup</small><b>{trip.origin}</b><span><em>Scheduled</em><b>{trip.pickupDate || trip.date}</b><b>{to12Hour(trip.pickupTime || trip.time)}</b></span></div>
             <ArrowRight size={18} style={{ color: 'var(--blue)', marginTop: 20 }} />
-            <div><small>Drop-off</small><b>{trip.destination}</b><span><em>Requested</em><b>{trip.date}</b><b>{to12Hour(trip.time)}</b></span><span><em>Estimated</em><b>{trip.estimatedDropDate}</b><b>{to12Hour(trip.estimatedDropTime)}</b></span><span><em>Actual</em>{trip.actualDropDate ? <><b>{trip.actualDropDate}</b><b>{to12Hour(trip.actualDropTime || '')}</b></> : <b>Awaiting delivery</b>}</span></div>
+            <div><small>Drop-off</small><b>{trip.destination}</b><span><em>Requested</em><b>{trip.requestedDeliveryDate || trip.date}</b><b>{to12Hour(trip.requestedDeliveryTime || trip.time)}</b></span>{trip.estimatedDropDate && <span><em>Estimated</em><b>{trip.estimatedDropDate}</b><b>{to12Hour(trip.estimatedDropTime || '')}</b></span>}<span><em>Actual</em>{trip.actualDropDate ? <><b>{trip.actualDropDate}</b><b>{to12Hour(trip.actualDropTime || '')}</b></> : <b>Awaiting delivery</b>}</span></div>
           </div>
-          <InfoSection title="Cargo details"><Info label="Material" value={trip.cargo.material} /><Info label="Cement company" value={trip.cargo.company} /><Info label="Cargo weight" value={trip.cargo.quantity} /><Info label="Cargo type" value={trip.cargo.loadType} />{trip.cargo.loadType === 'Bagged' && <Info label="No. of bags" value={trip.cargo.noOfBags || '—'} />}</InfoSection>
-          <InfoSection title="Truck details"><Info label="Truck number" value={trip.truck.number} /><Info label="Truck type" value={trip.truck.type} /><Info label="Configuration" value={trip.truck.configuration} /><Info label="Truck brand" value={trip.truck.brand} /></InfoSection>
-          <InfoSection title="Driver details"><Info label="Driver name" value={trip.driver || 'Unassigned'} /><Info label="Phone number" value={trip.driverNumber || 'Not available'} /></InfoSection>
-          <InfoSection title="Fuel details"><Info label="Assigned fuel" value={trip.fuel.assigned} /><Info label="Received fuel" value={trip.fuel.received} /><Info label="Station name" value={trip.fuel.station} /><Info label="Fulfilled at" value={trip.fuel.fulfilledAt} /></InfoSection>
-          <InfoSection title="Cash details"><Info label="Advanced amount" value={trip.cash.advance} /><Info label="Payment mode" value={trip.cash.paymentMode} /></InfoSection>
-          <h2 className="activity-title section-title">Extra expense</h2>
-          {trip.extras.map((extra) => <div className="extra-row" key={extra.id}><span className="extra-icon">{extra.type === 'Fuel' ? <GasPump size={16} /> : extra.type === 'Cash' ? <CurrencyInr size={16} /> : <Drop size={16} />}</span><div><b>Extra {extra.type} request</b><p>{extra.note}</p></div><strong>{extra.amount}</strong></div>)}
-          {!trip.extras.length && <Empty label="No extra expenses" />}
-          <h2 className="activity-title">Trip documents</h2>
-          {trip.documents.map((doc) => <div className="extra-row" key={doc.id}><span className="extra-icon"><FileText size={16} /></span><div><b>{doc.name}</b><p>{doc.type} · {doc.uploadedAt}</p></div><Status>Approved</Status></div>)}
-          {!trip.documents.length && <Empty label="No documents uploaded" />}
+          <InfoSection title="Cargo details">
+            <Info label="Material" value={trip.cargo?.material || trip.cargoMaterial || 'Cement'} />
+            <Info label="Company" value={trip.cargo?.company || trip.cargoCompany || trip.customer} />
+            <Info label="Cargo weight" value={trip.cargo?.quantity || trip.cargoWeight || '—'} />
+            <Info label="Cargo type" value={trip.cargo?.loadType || trip.cargoType || 'Bagged'} />
+            {(trip.cargo?.loadType || trip.cargoType) === 'Bagged' && <Info label="No. of bags" value={trip.cargo?.noOfBags || trip.noOfBags || `${trip.passengers} bags`} />}
+          </InfoSection>
+          {!isPendingReview && (
+            <>
+              <InfoSection title="Truck details"><Info label="Truck number" value={trip.truck?.number || 'Pending assignment'} /><Info label="Truck type" value={trip.truck?.type || 'Body'} /><Info label="Configuration" value={trip.truck?.configuration || '12 tyre'} /><Info label="Truck brand" value={trip.truck?.brand || 'Tata Motors'} /></InfoSection>
+              <InfoSection title="Driver details"><Info label="Driver name" value={trip.driver || 'Unassigned'} /><Info label="Phone number" value={trip.driverNumber || 'Not available'} /></InfoSection>
+              <InfoSection title="Fuel details"><Info label="Assigned fuel" value={trip.fuel?.assigned || '—'} /><Info label="Received fuel" value={trip.fuel?.received || '—'} /><Info label="Station name" value={trip.fuel?.station || '—'} /><Info label="Fulfilled at" value={trip.fuel?.fulfilledAt || '—'} /></InfoSection>
+              <InfoSection title="Cash details"><Info label="Advanced amount" value={trip.cash?.advance || '—'} /><Info label="Payment mode" value={trip.cash?.paymentMode || '—'} /></InfoSection>
+              <h2 className="activity-title section-title">Extra expenses</h2>
+              {trip.extras.map((extra) => <div className="extra-row" key={extra.id}><span className="extra-icon">{extra.type === 'Fuel' ? <GasPump size={16} /> : extra.type === 'Cash' ? <CurrencyInr size={16} /> : <Drop size={16} />}</span><div><b>Extra {extra.type} request</b><p>{extra.note}</p></div><strong>{extra.amount}</strong></div>)}
+              {!trip.extras.length && <Empty label="No extra expenses" />}
+              <h2 className="activity-title">Trip documents</h2>
+              {trip.documents.map((doc) => <div className="extra-row" key={doc.id}><span className="extra-icon"><FileText size={16} /></span><div><b>{doc.name}</b><p>{doc.type} · {doc.uploadedAt}</p></div><StatusBadge status="APPROVED" /></div>)}
+              {!trip.documents.length && <Empty label="No documents uploaded" />}
+            </>
+          )}
+          {role === 'Coordinator' && trip.status === 'NEW' && <button className="button secondary wide" onClick={onReminder} style={{ marginTop: 20 }}>Send reminder to Operations</button>}
         </div>
-        {role !== 'Operations' && (
+
+        {/* Operations: review NEW trip */}
+        {role === 'Operations' && trip.status === 'NEW' && (
           <div className="panel action-panel">
-            <h2>Driver actions</h2>
-            <p>Submit an expense or operational request linked to this trip.</p>
-            {role === 'Driver' && <><button className="button primary wide" onClick={onDocument}><UploadSimple size={16} style={{ display: 'inline', marginRight: 6 }} /> Upload trip document</button><button className="button primary wide" onClick={onExtra}><Plus size={16} style={{ display: 'inline', marginRight: 6 }} /> Extra request</button></>}
+            <h2>Review Request</h2>
+            <p>Operations must review this trip before it is sent to the driver.</p>
+            <button className="button primary wide" onClick={() => onApprove(trip)} style={{ marginTop: 12 }}>Approve & Assign Driver</button>
+            <button className="button danger wide" onClick={() => onOpsReject(trip)} style={{ marginTop: 8 }}>Reject request</button>
+          </div>
+        )}
+
+        {/* Driver: accept/reject APPROVED trip */}
+        {role === 'Driver' && trip.status === 'APPROVED' && (
+          <div className="panel action-panel">
+            <h2>Driver Assignment</h2>
+            <p>You have been assigned to this trip. Please accept or reject it.</p>
+            <button className="button primary wide" onClick={() => onAccept(trip)} style={{ marginTop: 12 }}>Accept assignment</button>
+            <button className="button danger wide" onClick={() => onDvReject(trip)} style={{ marginTop: 8 }}>Reject assignment</button>
+          </div>
+        )}
+
+        {/* Driver: upload doc or start trip */}
+        {role === 'Driver' && (trip.status === 'ACCEPTED' || trip.status === 'DOCUMENT_UPLOADED') && (
+          <div className="panel action-panel">
+            <h2>Driver Actions</h2>
+            <p>Upload initial documents or start the trip journey.</p>
+            <button className="button primary wide" onClick={onDocument} style={{ marginTop: 12 }}><UploadSimple size={16} style={{ display: 'inline', marginRight: 6 }} /> Upload trip document</button>
+            <button className="button primary wide" onClick={() => onStart(trip)} style={{ marginTop: 8 }}>Start Journey</button>
+          </div>
+        )}
+
+        {/* Driver: in-transit actions */}
+        {role === 'Driver' && (trip.status === 'TRIP_STARTED' || trip.status === 'TRIP_ON_HOLD') && (
+          <div className="panel action-panel">
+            <h2>In-Transit Actions</h2>
+            <p>Manage journey status during the trip.</p>
+            {trip.status === 'TRIP_STARTED'
+              ? <button className="button secondary wide" onClick={() => onHold(trip)} style={{ marginTop: 12 }}>Put Trip On Hold</button>
+              : <button className="button primary wide" onClick={() => onStart(trip)} style={{ marginTop: 12 }}>Resume Trip</button>}
+            <button className="button primary wide" onClick={() => onReach(trip)} style={{ marginTop: 8 }}>Mark as Reached</button>
+            <button className="button primary wide" onClick={onExtra} style={{ marginTop: 8 }}><Plus size={16} style={{ display: 'inline', marginRight: 6 }} /> Extra expense request</button>
+          </div>
+        )}
+
+        {/* Driver: upload stamped doc to complete */}
+        {role === 'Driver' && trip.status === 'REACHED' && (
+          <div className="panel action-panel">
+            <h2>Trip Delivery Completion</h2>
+            <p>Upload the stamped document to complete this trip.</p>
+            <button className="button primary wide" onClick={onUploadStamped} style={{ marginTop: 12 }}><UploadSimple size={16} style={{ display: 'inline', marginRight: 6 }} /> Upload Stamped Document</button>
           </div>
         )}
       </div>
@@ -498,10 +695,19 @@ function TripDetail({ trip, role, onBack, onExtra, onDocument, onEdit, onFollowu
 }
 
 function InfoSection({ title, children }: { title: string; children: React.ReactNode }) { return <><h2 className="activity-title section-title">{title}</h2><div className="info-grid compact-grid">{children}</div></> }
-function DriverDetails({ trip }: { trip: Trip }) { return <section className="panel driver-details-panel"><InfoSection title="Driver details"><Info label="Driver name" value={trip.driver || 'Unassigned'} /><Info label="Phone number" value={trip.driverNumber || 'Not available'} /></InfoSection></section> }
 function Empty({ label }: { label: string }) { return <div className="empty">{label}</div> }
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) { return <div className="modal-backdrop"><div className="modal"><div className="modal-header"><h2>{title}</h2><button onClick={onClose} aria-label="Close"><X size={18} /></button></div>{children}</div></div> }
-function EditModal({ entity, drivers, vehicles, role, onClose, onSave }: { entity: Request | Trip; drivers: Driver[]; vehicles: Vehicle[]; role: Role; onClose: () => void; onSave: (data: Partial<Request>) => void }) {
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function to12Hour(time: string) { const [h, m] = time.split(':').map(Number); if (Number.isNaN(h) || Number.isNaN(m)) return time; return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}` }
+function toDatetimeLocal(date: string, time: string): string { try { const months: Record<string, number> = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 }; const p = date.trim().split(' '); if (p.length === 3) { const d = new Date(Number(p[2]), months[p[1]] ?? 0, Number(p[0]), Number(time.split(':')[0] || '0'), Number(time.split(':')[1] || '0')); if (!isNaN(d.getTime())) return `${p[2]}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` } return '' } catch { return '' } }
+function fromDatetimeLocal(value: string): { date: string; time: string } { if (!value) return { date: '', time: '' }; const d = new Date(value); const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']; return { date: `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`, time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` } }
+function Info({ label, value }: { label: string; value: string }) { return <div><small>{label}</small><b>{value}</b></div> }
+
+// ─── Edit Modal ───────────────────────────────────────────────────────────────
+
+function EditModal({ entity, drivers, vehicles, role, onClose, onSave }: { entity: Trip; drivers: Driver[]; vehicles: Vehicle[]; role: Role; onClose: () => void; onSave: (data: Partial<Trip>) => void }) {
   const [reference, setReference] = useState(entity.reference)
   const [customer, setCustomer] = useState(entity.customer)
   const [origin, setOrigin] = useState(entity.origin)
@@ -510,14 +716,14 @@ function EditModal({ entity, drivers, vehicles, role, onClose, onSave }: { entit
   const [deliveryDT, setDeliveryDT] = useState(toDatetimeLocal(entity.requestedDeliveryDate || entity.date, entity.requestedDeliveryTime || entity.time))
   const [cargoMaterial, setCargoMaterial] = useState(entity.cargoMaterial || 'Cement')
   const [cargoWeight, setCargoWeight] = useState(entity.cargoWeight || '')
-  const [cargoType, setCargoType] = useState<Request['cargoType']>(entity.cargoType || 'Bagged')
+  const [cargoType, setCargoType] = useState<Trip['cargoType']>(entity.cargoType || 'Bagged')
   const [noOfBags, setNoOfBags] = useState(entity.noOfBags || '')
-  // Driver selection — only for Operations
   const [selectedDriverId, setSelectedDriverId] = useState(entity.driverNumber ?? '')
   const selectedDriver = role !== 'Coordinator' ? (drivers.find((d) => d.id === selectedDriverId) ?? null) : null
   const selectedVehicle = selectedDriver ? (vehicles.find((v) => v.truck_id === selectedDriver.truck_id) ?? null) : null
+
   return (
-    <Modal title={`Edit ${'tripStatus' in entity ? 'trip' : 'request'}`} onClose={onClose}>
+    <Modal title="Edit trip" onClose={onClose}>
       <form onSubmit={(e) => { e.preventDefault(); const { date, time } = fromDatetimeLocal(pickupDT); const { date: dDate, time: dTime } = fromDatetimeLocal(deliveryDT); onSave({ reference, customer, origin, destination, date, time, requestedDeliveryDate: dDate, requestedDeliveryTime: dTime, cargoMaterial, cargoWeight, cargoType, noOfBags, passengers: Number(noOfBags) || entity.passengers, ...(role !== 'Coordinator' && { driver: selectedDriver?.name ?? entity.driver, driverNumber: selectedDriverId || entity.driverNumber }) }) }}>
         <label>Reference<input value={reference} onChange={(e) => setReference(e.target.value)} /></label>
         <label>Customer<input value={customer} onChange={(e) => setCustomer(e.target.value)} /></label>
@@ -525,18 +731,14 @@ function EditModal({ entity, drivers, vehicles, role, onClose, onSave }: { entit
         <label>Pickup date &amp; time<input type="datetime-local" value={pickupDT} onChange={(e) => setPickupDT(e.target.value)} /></label>
         <label>Delivery date &amp; time<input type="datetime-local" value={deliveryDT} onChange={(e) => setDeliveryDT(e.target.value)} /></label>
         <label>Material<input value={cargoMaterial} onChange={(e) => setCargoMaterial(e.target.value)} /></label>
-        <div className="form-row"><label>Cargo weight<input value={cargoWeight} onChange={(e) => setCargoWeight(e.target.value)} placeholder="28 tonnes" /></label><label>Cargo type<select value={cargoType} onChange={(e) => setCargoType(e.target.value as Request['cargoType'])}><option value="Bagged">Bagged</option><option value="Loose">Loose</option></select></label></div>
+        <div className="form-row"><label>Cargo weight<input value={cargoWeight} onChange={(e) => setCargoWeight(e.target.value)} placeholder="28 tonnes" /></label><label>Cargo type<select value={cargoType} onChange={(e) => setCargoType(e.target.value as Trip['cargoType'])}><option value="Bagged">Bagged</option><option value="Loose">Loose</option></select></label></div>
         <label>No. of bags<input value={noOfBags} onChange={(e) => setNoOfBags(e.target.value)} placeholder="560 bags" /></label>
         {role !== 'Coordinator' && (
           <div style={{ borderTop: '1px solid var(--line)', paddingTop: 14, marginTop: 4 }}>
             <label style={{ display: 'block', marginBottom: 6 }}>Assigned driver
               <select value={selectedDriverId} onChange={(e) => setSelectedDriverId(e.target.value)} style={{ marginTop: 6 }}>
                 <option value="">— Unassigned —</option>
-                {drivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name} · {d.source_location} · {d.truck_id}{d.status === 'unavailable' ? ' (on trip)' : ''}
-                  </option>
-                ))}
+                {drivers.map((d) => <option key={d.id} value={d.id}>{d.name} · {d.source_location} · {d.truck_id}{d.status === 'unavailable' ? ' (on trip)' : ''}</option>)}
               </select>
             </label>
             {selectedDriver && (
@@ -571,11 +773,10 @@ function EditModal({ entity, drivers, vehicles, role, onClose, onSave }: { entit
     </Modal>
   )
 }
-function extractCity(location: string): string {
-  // Take the last comma-separated segment as the city (e.g. "Hotgi Road, Solapur" → "solapur")
-  const parts = location.split(',')
-  return parts[parts.length - 1].trim().toLowerCase()
-}
+
+// ─── Auto-Assign Driver helpers (kept from git) ───────────────────────────────
+
+function extractCity(location: string): string { const parts = location.split(','); return parts[parts.length - 1].trim().toLowerCase() }
 function scoreDriverForOrigin(driver: Driver, origin: string): number {
   if (!origin.trim()) return 0
   const originTokens = origin.toLowerCase().split(/[\s,]+/).filter((w) => w.length > 2)
@@ -583,71 +784,30 @@ function scoreDriverForOrigin(driver: Driver, origin: string): number {
   return originTokens.reduce((score, ow) => score + (locTokens.some((lw) => lw.includes(ow) || ow.includes(lw)) ? 1 : 0), 0)
 }
 function scoreDriverForCity(driver: Driver, origin: string): number {
-  // City-level: exact match of last comma-segment scores highest (3), then token-level match
   const originCity = extractCity(origin)
   const driverCity = extractCity(driver.source_location)
   if (originCity && (driverCity.includes(originCity) || originCity.includes(driverCity))) return 3
   return scoreDriverForOrigin(driver, origin)
 }
-function findBestDriver(origin: string, drivers: Driver[]): Driver | null {
-  const available = drivers.filter((d) => d.status === 'available')
-  if (!available.length) return null
-  return available.reduce((best, d) => scoreDriverForOrigin(d, origin) > scoreDriverForOrigin(best, origin) ? d : best, available[0])
-}
 
-function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (r: Request) => void }) {
-  const [reference, setReference] = useState('')
-  const [customer, setCustomer] = useState('')
-  const [origin, setOrigin] = useState('')
-  const [destination, setDestination] = useState('')
-  const [pickupDT, setPickupDT] = useState('')
-  const [deliveryDT, setDeliveryDT] = useState('')
-  const [cargoMaterial, setCargoMaterial] = useState('Cement')
-  const [cargoWeight, setCargoWeight] = useState('')
-  const [cargoType, setCargoType] = useState<Request['cargoType']>('Bagged')
-  const [noOfBags, setNoOfBags] = useState('')
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const { date, time } = fromDatetimeLocal(pickupDT)
-    const { date: dDate, time: dTime } = fromDatetimeLocal(deliveryDT)
-    const now = new Date(); const day = now.getDate(); const month = now.toLocaleString('en-GB', { month: 'short' }); const year = now.getFullYear(); const hours = now.getHours(); const mins = String(now.getMinutes()).padStart(2, '0'); const sfx = hours >= 12 ? 'PM' : 'AM'; const h12 = hours % 12 || 12
-    onCreate({ id: `req-${Date.now()}`, reference: reference || `DR-${1050 + Math.floor(Math.random() * 20)}`, customer: customer || 'New customer', origin: origin || 'Wadgaon, Pune', destination: destination || 'Nashik MIDC', date: date || '20 Aug 2026', time: time || '09:00', requestedDeliveryDate: dDate || date || '20 Aug 2026', requestedDeliveryTime: dTime || time || '09:00', cargoMaterial, cargoCompany: customer, cargoWeight, cargoType, noOfBags: noOfBags || '1 bag', createdAt: `${day} ${month} ${year} · ${h12}:${mins} ${sfx}`, passengers: Number(noOfBags) || 1, status: 'Pending' })
-  }
-  return (
-    <Modal title="Create trip request" onClose={onClose}>
-      <form onSubmit={submit}>
-        <label>Reference<input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="DR-1049" /></label>
-        <label>Customer<input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Company or person" /></label>
-        <div className="form-row"><label>Pickup<input value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="City or address" /></label><label>Drop-off<input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="City or address" /></label></div>
-        <label>Pickup date &amp; time<input type="datetime-local" value={pickupDT} onChange={(e) => setPickupDT(e.target.value)} /></label>
-        <label>Delivery date &amp; time<input type="datetime-local" value={deliveryDT} onChange={(e) => setDeliveryDT(e.target.value)} /></label>
-        <div className="form-row"><label>Cargo weight<input value={cargoWeight} onChange={(e) => setCargoWeight(e.target.value)} placeholder="28 tonnes" /></label><label>Cargo type<select value={cargoType} onChange={(e) => setCargoType(e.target.value as Request['cargoType'])}><option value="Bagged">Bagged</option><option value="Loose">Loose</option></select></label></div>
-        <label>No. of bags<input value={noOfBags} onChange={(e) => setNoOfBags(e.target.value)} placeholder="560 bags" /></label>
-        <button className="button primary wide" type="submit">Create request</button>
-      </form>
-    </Modal>
-  )
-}
-function AssignDriverModal({ request, drivers, vehicles, onClose, onConfirm }: { request: Request; drivers: Driver[]; vehicles: Vehicle[]; onClose: () => void; onConfirm: (driver?: Driver) => void }) {
-  const originCity = extractCity(request.origin)
+// ─── AssignDriverModal (auto-assign, kept from git) ───────────────────────────
+
+function AssignDriverModal({ trip, drivers, vehicles, onClose, onConfirm }: { trip: Trip; drivers: Driver[]; vehicles: Vehicle[]; onClose: () => void; onConfirm: (driver?: Driver) => void }) {
+  const originCity = extractCity(trip.origin)
   const scored = drivers
-    .map((d) => ({ driver: d, score: scoreDriverForCity(d, request.origin), vehicle: vehicles.find((v) => v.truck_id === d.truck_id) ?? null }))
-    .sort((a, b) => {
-      const aAvail = a.driver.status === 'available' ? 1 : 0
-      const bAvail = b.driver.status === 'available' ? 1 : 0
-      if (aAvail !== bAvail) return bAvail - aAvail
-      return b.score - a.score
-    })
+    .map((d) => ({ driver: d, score: scoreDriverForCity(d, trip.origin), vehicle: vehicles.find((v) => v.truck_id === d.truck_id) ?? null }))
+    .sort((a, b) => { const aA = a.driver.status === 'available' ? 1 : 0; const bA = b.driver.status === 'available' ? 1 : 0; if (aA !== bA) return bA - aA; return b.score - a.score })
   const suggested = scored.find((s) => s.driver.status === 'available') ?? null
   const [selectedId, setSelectedId] = useState(suggested?.driver.id ?? '')
   const selectedEntry = scored.find((s) => s.driver.id === selectedId) ?? null
+
   return (
     <div className="modal-backdrop">
       <div className="modal" style={{ maxWidth: 460 }}>
         <div className="modal-header">
           <div>
-            <h2 style={{ marginBottom: 2 }}>Assign driver</h2>
-            <p style={{ fontSize: 11, color: 'var(--muted-ink)', margin: 0 }}>{request.reference} &middot; Pickup: {request.origin}</p>
+            <h2 style={{ marginBottom: 2 }}>Approve &amp; Assign Driver</h2>
+            <p style={{ fontSize: 11, color: 'var(--muted-ink)', margin: 0 }}>{trip.reference} &middot; Pickup: {trip.origin}</p>
           </div>
           <button onClick={onClose} aria-label="Close"><X size={18} /></button>
         </div>
@@ -698,148 +858,122 @@ function AssignDriverModal({ request, drivers, vehicles, onClose, onConfirm }: {
         )}
         <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button className="button primary wide" disabled={!selectedId} onClick={() => onConfirm(selectedEntry?.driver ?? undefined)}>
-            {selectedId ? `Assign ${selectedEntry?.driver.name ?? ''} & Accept` : 'Select a driver to continue'}
+            {selectedId ? `Assign ${selectedEntry?.driver.name ?? ''} & Approve` : 'Select a driver to continue'}
           </button>
-          <button className="button secondary wide" onClick={() => onConfirm(undefined)}>Accept without driver</button>
+          <button className="button secondary wide" onClick={() => onConfirm(undefined)}>Approve without driver</button>
         </div>
       </div>
     </div>
   )
 }
-function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) { return <Modal title="Import requests" onClose={onClose}><div className="upload"><UploadSimple size={24} style={{ color: 'var(--blue)' }} /><b>Drop your Excel file here</b><p>or choose a .xlsx file from your device</p><button className="button secondary">Choose file</button></div><div className="import-preview"><b>Preview ready</b><span>2 valid requests · 0 errors</span></div><button className="button primary wide" onClick={onDone}>Validate and import</button></Modal> }
+
+// ─── Create / Import Modals ───────────────────────────────────────────────────
+
+function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (t: Trip) => void }) {
+  const [reference, setReference] = useState('')
+  const [customer, setCustomer] = useState('')
+  const [origin, setOrigin] = useState('')
+  const [destination, setDestination] = useState('')
+  const [pickupDT, setPickupDT] = useState('')
+  const [deliveryDT, setDeliveryDT] = useState('')
+  const [cargoMaterial, setCargoMaterial] = useState('Cement')
+  const [cargoWeight, setCargoWeight] = useState('')
+  const [cargoType, setCargoType] = useState<Trip['cargoType']>('Bagged')
+  const [noOfBags, setNoOfBags] = useState('')
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const { date, time } = fromDatetimeLocal(pickupDT)
+    const { date: dDate, time: dTime } = fromDatetimeLocal(deliveryDT)
+    const now = new Date(); const day = now.getDate(); const month = now.toLocaleString('en-GB', { month: 'short' }); const year = now.getFullYear(); const hours = now.getHours(); const mins = String(now.getMinutes()).padStart(2, '0'); const sfx = hours >= 12 ? 'PM' : 'AM'; const h12 = hours % 12 || 12
+    onCreate({ id: `req-${Date.now()}`, reference: reference || `DR-${1050 + Math.floor(Math.random() * 20)}`, customer: customer || 'New customer', origin: origin || 'Wadgaon, Pune', destination: destination || 'Nashik MIDC', date: date || '20 Aug 2026', time: time || '09:00', requestedDeliveryDate: dDate || date || '20 Aug 2026', requestedDeliveryTime: dTime || time || '09:00', cargoMaterial, cargoCompany: customer, cargoWeight, cargoType, noOfBags: noOfBags || '1 bag', createdAt: `${day} ${month} ${year} · ${h12}:${mins} ${sfx}`, passengers: Number(noOfBags) || 1, status: 'NEW', documents: [], extras: [] })
+  }
+
+  return (
+    <Modal title="Create trip" onClose={onClose}>
+      <form onSubmit={submit}>
+        <label>Reference<input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="DR-1049" /></label>
+        <label>Customer<input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Company or person" /></label>
+        <div className="form-row"><label>Pickup<input value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="City or address" /></label><label>Drop-off<input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="City or address" /></label></div>
+        <label>Pickup date &amp; time<input type="datetime-local" value={pickupDT} onChange={(e) => setPickupDT(e.target.value)} /></label>
+        <label>Delivery date &amp; time<input type="datetime-local" value={deliveryDT} onChange={(e) => setDeliveryDT(e.target.value)} /></label>
+        <div className="form-row"><label>Cargo weight<input value={cargoWeight} onChange={(e) => setCargoWeight(e.target.value)} placeholder="28 tonnes" /></label><label>Cargo type<select value={cargoType} onChange={(e) => setCargoType(e.target.value as Trip['cargoType'])}><option value="Bagged">Bagged</option><option value="Loose">Loose</option></select></label></div>
+        <label>No. of bags<input value={noOfBags} onChange={(e) => setNoOfBags(e.target.value)} placeholder="560 bags" /></label>
+        <button className="button primary wide" type="submit">Create trip</button>
+      </form>
+    </Modal>
+  )
+}
+
+function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) { return <Modal title="Import trips" onClose={onClose}><div className="upload"><UploadSimple size={24} style={{ color: 'var(--blue)' }} /><b>Drop your Excel file here</b><p>or choose a .xlsx file from your device</p><button className="button secondary">Choose file</button></div><div className="import-preview"><b>Preview ready</b><span>2 valid trips · 0 errors</span></div><button className="button primary wide" onClick={onDone}>Validate and import</button></Modal> }
 function ExtraModal({ onClose, onCreate }: { onClose: () => void; onCreate: (x: Extra) => void }) { const [type, setType] = useState<Extra['type']>('Fuel'); const [amount, setAmount] = useState(''); const [note, setNote] = useState(''); return <Modal title="Submit extra request" onClose={onClose}><form onSubmit={(e) => { e.preventDefault(); onCreate({ id: `ex-${Date.now()}`, type, amount: amount.trim() ? `₹${amount.trim()}` : '₹0', note: note.trim() || 'Submitted by driver for review', status: 'Submitted' }) }}><label>Request type<select value={type} onChange={(e) => setType(e.target.value as Extra['type'])}><option>Fuel</option><option>Cash</option><option>AdBlue</option></select></label><label>Amount<input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder="5000" /></label><label>Note<textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a short note" rows={3} /></label><button className="button primary wide" type="submit">Submit request</button></form></Modal> }
-function DocumentModal({ onClose, onCreate }: { onClose: () => void; onCreate: (x: TripDocument) => void }) { const [type, setType] = useState<TripDocument['type']>('LR'); const [name, setName] = useState(''); return <Modal title="Upload trip document" onClose={onClose}><form onSubmit={(e) => { e.preventDefault(); onCreate({ id: `doc-${Date.now()}`, name: name || `Trip-document-${type}.pdf`, type, uploadedAt: 'Just now' }) }}><div className="upload"><UploadSimple size={24} style={{ color: 'var(--blue)' }} /><b>Select a document</b><p>PDF, JPG, or PNG up to 10 MB</p><input type="file" onChange={(e) => setName(e.target.files?.[0]?.name || '')} /></div><label>Document type<select value={type} onChange={(e) => setType(e.target.value as TripDocument['type'])}><option>LR</option><option>WB</option><option>Invoice</option><option>Other</option></select></label><button className="button primary wide" type="submit">Upload document</button></form></Modal> }
+function DocumentModal({ onClose, onCreate, isStamped }: { onClose: () => void; onCreate: (x: TripDocument) => void; isStamped?: boolean }) { const [type, setType] = useState<TripDocument['type']>('LR'); const [name, setName] = useState(''); return <Modal title={isStamped ? 'Upload Stamped Document' : 'Upload trip document'} onClose={onClose}><form onSubmit={(e) => { e.preventDefault(); onCreate({ id: `doc-${Date.now()}`, name: name || `Trip-document-${type}.pdf`, type, uploadedAt: 'Just now' }) }}><div className="upload"><UploadSimple size={24} style={{ color: 'var(--blue)' }} /><b>{isStamped ? 'Select the stamped document' : 'Select a document'}</b><p>PDF, JPG, or PNG up to 10 MB</p><input type="file" onChange={(e) => setName(e.target.files?.[0]?.name || '')} /></div><label>Document type<select value={type} onChange={(e) => setType(e.target.value as TripDocument['type'])}><option>LR</option><option>WB</option><option>Invoice</option><option>Other</option></select></label><button className="button primary wide" type="submit">{isStamped ? 'Upload & Complete Trip' : 'Upload document'}</button></form></Modal> }
+
+// ─── TripOpsReport ────────────────────────────────────────────────────────────
 
 function TripOpsReport({ trips }: { trips: Trip[] }) {
   const [statusFilter, setStatusFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Summary — all from real trips data
   const total = trips.length
-  const accepted = trips.filter(t => t.status === 'Accepted').length
-  const rejected = trips.filter(t => t.status === 'Rejected').length
-  const active = trips.filter(t => t.tripStatus === 'In progress').length
-  const completed = trips.filter(t => t.tripStatus === 'Completed').length
-  const pending = trips.filter(t => t.tripStatus === 'Scheduled').length
+  const accepted = trips.filter((t) => !['NEW', 'OP_REJECTED', 'DV_REJECTED'].includes(t.status)).length
+  const rejected = trips.filter((t) => ['OP_REJECTED', 'DV_REJECTED'].includes(t.status)).length
+  const active = trips.filter((t) => ['TRIP_STARTED', 'TRIP_ON_HOLD', 'REACHED'].includes(t.status)).length
+  const completed = trips.filter((t) => t.status === 'TRIP_COMPLETED').length
+  const pending = trips.filter((t) => ['NEW', 'APPROVED', 'ACCEPTED', 'DOCUMENT_UPLOADED'].includes(t.status)).length
 
-  // Table rows — mapped from real trips
-  const rows = trips.map(t => ({
-    id: t.reference,
-    source: t.origin,
-    destination: t.destination,
-    loadType: t.cargo?.loadType ?? '—',
-    weight: t.cargo?.quantity ?? '—',
-    driver: t.driver || 'Unassigned',
-    status: t.tripStatus,
-    delivery: t.estimatedDropDate || t.date,
-  }))
+  const rows = trips.map((t) => ({ id: t.reference, source: t.origin, destination: t.destination, loadType: t.cargo?.loadType ?? '—', weight: t.cargo?.quantity ?? '—', driver: t.driver || 'Unassigned', status: t.status, delivery: t.estimatedDropDate || t.date }))
 
-  const filteredRows = rows.filter(r => {
-    const matchesStatus = statusFilter === 'All' || r.status === statusFilter;
-    const q = searchQuery.toLowerCase().trim();
-    const matchesQuery = !q ||
-      r.id.toLowerCase().includes(q) ||
-      r.source.toLowerCase().includes(q) ||
-      r.destination.toLowerCase().includes(q) ||
-      r.driver.toLowerCase().includes(q) ||
-      r.loadType.toLowerCase().includes(q) ||
-      r.weight.toLowerCase().includes(q);
-    return matchesStatus && matchesQuery;
+  const filteredRows = rows.filter((r) => {
+    let matchesStatus = true
+    if (statusFilter === 'New') matchesStatus = r.status === 'NEW'
+    else if (statusFilter === 'Scheduled') matchesStatus = ['APPROVED', 'ACCEPTED', 'DOCUMENT_UPLOADED'].includes(r.status)
+    else if (statusFilter === 'Active') matchesStatus = ['TRIP_STARTED', 'TRIP_ON_HOLD', 'REACHED'].includes(r.status)
+    else if (statusFilter === 'Completed') matchesStatus = r.status === 'TRIP_COMPLETED'
+    const q = searchQuery.toLowerCase().trim()
+    const matchesQuery = !q || r.id.toLowerCase().includes(q) || r.source.toLowerCase().includes(q) || r.destination.toLowerCase().includes(q) || r.driver.toLowerCase().includes(q)
+    return matchesStatus && matchesQuery
   })
 
   const handleDownloadExcel = async () => {
-    const XLSX = await import('xlsx');
-    const data = filteredRows.map(r => ({
-      'Trip ID': r.id,
-      'Source': r.source,
-      'Destination': r.destination,
-      'Load Type': r.loadType,
-      'Weight': r.weight,
-      'Driver': r.driver,
-      'Status': r.status,
-      'Est. Delivery': r.delivery
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Trips');
-    XLSX.writeFile(workbook, `Trip_Operations_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    const XLSX = await import('xlsx')
+    const data = filteredRows.map((r) => ({ 'Trip ID': r.id, Source: r.source, Destination: r.destination, 'Load Type': r.loadType, Weight: r.weight, Driver: r.driver, Status: getStatusLabel(r.status), 'Est. Delivery': r.delivery }))
+    const worksheet = XLSX.utils.json_to_sheet(data); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, 'Trips'); XLSX.writeFile(workbook, `Trip_Operations_Report_${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
-  // Bar chart — real counts
-  const dist = [
-    { label: 'Pending', count: pending, color: '#3b82f6' },
-    { label: 'In progress', count: active, color: '#8b5cf6' },
-    { label: 'Completed', count: completed, color: '#10b981' },
-  ]
-  const maxCount = Math.max(...dist.map(d => d.count), 1)
-
-  const statusChip = (s: string) => {
-    const map: Record<string, { bg: string; color: string }> = {
-      'Completed': { bg: '#dcfce7', color: '#166534' },
-      'In progress': { bg: '#ede9fe', color: '#5b21b6' },
-      'Scheduled': { bg: '#dbeafe', color: '#1d4ed8' },
-    }
-    const c = map[s] ?? { bg: '#f1f5f9', color: '#475569' }
-    return <span style={{ display: 'inline-block', padding: '0.2rem 0.6rem', borderRadius: 9999, fontSize: '0.75rem', fontWeight: 500, whiteSpace: 'nowrap', background: c.bg, color: c.color }}>{s}</span>
-  }
+  const dist = [{ label: 'Pending', count: pending, color: '#3b82f6' }, { label: 'Active', count: active, color: '#8b5cf6' }, { label: 'Completed', count: completed, color: '#10b981' }]
+  const maxCount = Math.max(...dist.map((d) => d.count), 1)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <section className="stats" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
-          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Total Trips</p>
-          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{total}</strong>
-          <small style={{ color: '#8993a2', fontSize: '10px' }}>All time</small>
-        </div>
-        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
-          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Accepted Trips</p>
-          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{accepted}</strong>
-          <small style={{ color: '#8993a2', fontSize: '10px' }}>Converted from requests</small>
-        </div>
-        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
-          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Rejected Trips</p>
-          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{rejected}</strong>
-          <small style={{ color: '#8993a2', fontSize: '10px' }}>Declined</small>
-        </div>
-        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
-          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Active Trips</p>
-          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{active}</strong>
-          <small style={{ color: '#8993a2', fontSize: '10px' }}>Currently moving</small>
-        </div>
-        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
-          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Completed Trips</p>
-          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{completed}</strong>
-          <small style={{ color: '#8993a2', fontSize: '10px' }}>Delivered</small>
-        </div>
-        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
-          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Pending Trips</p>
-          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{pending}</strong>
-          <small style={{ color: '#8993a2', fontSize: '10px' }}>Scheduled, not started</small>
-        </div>
+        {[{ label: 'Total Trips', value: total, hint: 'All time' }, { label: 'Accepted Trips', value: accepted, hint: 'Approved or active' }, { label: 'Rejected Trips', value: rejected, hint: 'Declined' }, { label: 'Active Trips', value: active, hint: 'Currently moving' }, { label: 'Completed Trips', value: completed, hint: 'Delivered' }, { label: 'Pending Trips', value: pending, hint: 'Not yet started' }].map(({ label, value, hint }) => (
+          <div key={label} className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
+            <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>{label}</p>
+            <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{value}</strong>
+            <small style={{ color: '#8993a2', fontSize: '10px' }}>{hint}</small>
+          </div>
+        ))}
       </section>
 
       <div className="panel">
         <div className="panel-header" style={{ alignItems: 'center' }}>
           <div><h2>All Trips</h2><p>Live data from trips</p></div>
-          <button className="icon-create" onClick={handleDownloadExcel} title="Download Excel (.xlsx)" aria-label="Download Excel">
-            <DownloadSimple size={18} />
-          </button>
+          <button className="icon-create" onClick={handleDownloadExcel} title="Download Excel (.xlsx)" aria-label="Download Excel"><DownloadSimple size={18} /></button>
         </div>
         <div className="filters" style={{ flexWrap: 'wrap' }}>
-          <div className="search"><MagnifyingGlass size={16} style={{ color: '#9ca6b4', marginRight: 4 }} /><input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search trip ID, source, destination, driver..." /></div>
-          <div className="filter-group">{['All', 'Scheduled', 'In progress', 'Completed'].map(s => <button key={s} className={statusFilter === s ? 'filter active' : 'filter'} onClick={() => setStatusFilter(s)}>{s}</button>)}</div>
+          <div className="search"><MagnifyingGlass size={16} style={{ color: '#9ca6b4', marginRight: 4 }} /><input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search trip ID, source, destination, driver..." /></div>
+          <div className="filter-group">{['All', 'New', 'Scheduled', 'Active', 'Completed'].map((s) => <button key={s} className={statusFilter === s ? 'filter active' : 'filter'} onClick={() => setStatusFilter(s)}>{s}</button>)}</div>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                {['Trip ID', 'Source', 'Destination', 'Load Type', 'Weight', 'Driver', 'Status', 'Est. Delivery'].map(h =>
-                  <th key={h} style={{ textAlign: 'left', padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>)}
+                {['Trip ID', 'Source', 'Destination', 'Load Type', 'Weight', 'Driver', 'Status', 'Est. Delivery'].map((h) => <th key={h} style={{ textAlign: 'left', padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
-              {filteredRows.map(row => (
+              {filteredRows.map((row) => (
                 <tr key={row.id} style={{ borderBottom: '1px solid #f8fafc' }}>
                   <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontSize: '0.75rem', color: '#64748b' }}>{row.id}</td>
                   <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{row.source}</td>
@@ -847,7 +981,7 @@ function TripOpsReport({ trips }: { trips: Trip[] }) {
                   <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{row.loadType}</td>
                   <td style={{ padding: '0.75rem 1rem', color: '#475569', textAlign: 'right' }}>{row.weight}</td>
                   <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{row.driver}</td>
-                  <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>{statusChip(row.status)}</td>
+                  <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}><StatusBadge status={row.status} /></td>
                   <td style={{ padding: '0.75rem 1rem', color: '#475569', whiteSpace: 'nowrap' }}>{row.delivery}</td>
                 </tr>
               ))}
@@ -860,12 +994,10 @@ function TripOpsReport({ trips }: { trips: Trip[] }) {
       <div className="panel">
         <div className="panel-header"><div><h2>Trip Status Distribution</h2><p>Breakdown of all trips by current status</p></div></div>
         <div style={{ padding: '0 1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {dist.map(d => (
+          {dist.map((d) => (
             <div key={d.label} style={{ display: 'grid', gridTemplateColumns: '96px 1fr 44px', alignItems: 'center', gap: '0.75rem' }}>
               <span style={{ fontSize: '0.8125rem', color: '#475569', fontWeight: 500 }}>{d.label}</span>
-              <div style={{ background: '#f1f5f9', borderRadius: 9999, height: 10, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${Math.round((d.count / maxCount) * 100)}%`, background: d.color, borderRadius: 9999, transition: 'width 0.4s ease' }} />
-              </div>
+              <div style={{ background: '#f1f5f9', borderRadius: 9999, height: 10, overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.round((d.count / maxCount) * 100)}%`, background: d.color, borderRadius: 9999, transition: 'width 0.4s ease' }} /></div>
               <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b', textAlign: 'right' }}>{d.count}</span>
             </div>
           ))}
@@ -876,137 +1008,36 @@ function TripOpsReport({ trips }: { trips: Trip[] }) {
   )
 }
 
+// ─── FuelExpenseReport ────────────────────────────────────────────────────────
+
 function FuelExpenseReport({ trips }: { trips: Trip[] }) {
   const [searchQuery, setSearchQuery] = useState('')
-
-  const dummyRows = [
-    { trip: 'TR-001', driver: 'Rahul', truck: 'MH13AB1234', fuelAuth: '120 L', fuelRec: '115 L', authN: 120, recN: 115, cash: '₹2,000', extraFuel: false },
-    { trip: 'TR-002', driver: 'Amit', truck: 'MH13CD5678', fuelAuth: '100 L', fuelRec: '102 L', authN: 100, recN: 102, cash: '₹1,500', extraFuel: true },
-    { trip: 'TR-003', driver: 'Sagar', truck: 'MH13EF9012', fuelAuth: '130 L', fuelRec: '125 L', authN: 130, recN: 125, cash: '₹2,500', extraFuel: false },
-  ]
-
-  const filteredRows = dummyRows.filter(r => {
-    const q = searchQuery.toLowerCase().trim();
-    return !q ||
-      r.trip.toLowerCase().includes(q) ||
-      r.driver.toLowerCase().includes(q) ||
-      r.truck.toLowerCase().includes(q);
-  })
-
-  const handleDownloadExcel = async () => {
-    const XLSX = await import('xlsx');
-    const data = filteredRows.map(r => ({
-      'Trip': r.trip,
-      'Driver': r.driver,
-      'Truck': r.truck,
-      'Fuel Authorized': r.fuelAuth,
-      'Fuel Recorded': r.fuelRec,
-      'Cash Advance': r.cash,
-      'Extra Fuel': r.extraFuel ? 'Yes' : 'No'
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Fuel & Expenses');
-    XLSX.writeFile(workbook, `Fuel_Expense_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
-  }
-
-  const totalAuth = dummyRows.reduce((s, r) => s + r.authN, 0)
-  const totalRec = dummyRows.reduce((s, r) => s + r.recN, 0)
-  const extraCount = dummyRows.filter(r => r.extraFuel).length
-  const maxFuel = Math.max(totalAuth, totalRec, 1)
-
+  const dummyRows = [{ trip: 'TR-001', driver: 'Rahul', truck: 'MH13AB1234', fuelAuth: '120 L', fuelRec: '115 L', authN: 120, recN: 115, cash: '₹2,000', extraFuel: false }, { trip: 'TR-002', driver: 'Amit', truck: 'MH13CD5678', fuelAuth: '100 L', fuelRec: '102 L', authN: 100, recN: 102, cash: '₹1,500', extraFuel: true }, { trip: 'TR-003', driver: 'Sagar', truck: 'MH13EF9012', fuelAuth: '130 L', fuelRec: '125 L', authN: 130, recN: 125, cash: '₹2,500', extraFuel: false }]
+  const filteredRows = dummyRows.filter((r) => { const q = searchQuery.toLowerCase().trim(); return !q || r.trip.toLowerCase().includes(q) || r.driver.toLowerCase().includes(q) || r.truck.toLowerCase().includes(q) })
+  const handleDownloadExcel = async () => { const XLSX = await import('xlsx'); const data = filteredRows.map((r) => ({ Trip: r.trip, Driver: r.driver, Truck: r.truck, 'Fuel Authorized': r.fuelAuth, 'Fuel Recorded': r.fuelRec, 'Cash Advance': r.cash, 'Extra Fuel': r.extraFuel ? 'Yes' : 'No' })); const worksheet = XLSX.utils.json_to_sheet(data); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, 'Fuel & Expenses'); XLSX.writeFile(workbook, `Fuel_Expense_Report_${new Date().toISOString().slice(0, 10)}.xlsx`) }
+  const totalAuth = dummyRows.reduce((s, r) => s + r.authN, 0); const totalRec = dummyRows.reduce((s, r) => s + r.recN, 0); const extraCount = dummyRows.filter((r) => r.extraFuel).length; const maxFuel = Math.max(totalAuth, totalRec, 1)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <section className="stats" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
-          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Fuel Authorized</p>
-          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{totalAuth} L</strong>
-          <small style={{ color: '#8993a2', fontSize: '10px' }}>Across all trips</small>
-        </div>
-        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
-          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Fuel Recorded</p>
-          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{totalRec} L</strong>
-          <small style={{ color: '#8993a2', fontSize: '10px' }}>Actual consumption</small>
-        </div>
-        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
-          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Cash Advances</p>
-          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>₹6,000</strong>
-          <small style={{ color: '#8993a2', fontSize: '10px' }}>{dummyRows.length} trips</small>
-        </div>
-        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
-          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Fuel Transactions</p>
-          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{dummyRows.length}</strong>
-          <small style={{ color: '#8993a2', fontSize: '10px' }}>This period</small>
-        </div>
-        <div className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
-          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>Extra Fuel Requests</p>
-          <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{extraCount}</strong>
-          <small style={{ color: '#8993a2', fontSize: '10px' }}>Pending review</small>
-        </div>
+        {[{ label: 'Fuel Authorized', value: `${totalAuth} L`, hint: 'Across all trips' }, { label: 'Fuel Recorded', value: `${totalRec} L`, hint: 'Actual consumption' }, { label: 'Cash Advances', value: '₹6,000', hint: `${dummyRows.length} trips` }, { label: 'Fuel Transactions', value: dummyRows.length, hint: 'This period' }, { label: 'Extra Fuel Requests', value: extraCount, hint: 'Pending review' }].map(({ label, value, hint }) => (
+          <div key={label} className="stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', padding: '16px 18px' }}>
+            <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-ink)', fontWeight: 500 }}>{label}</p>
+            <strong style={{ fontSize: '24px', letterSpacing: '-.04em', margin: '4px 0 2px' }}>{value}</strong>
+            <small style={{ color: '#8993a2', fontSize: '10px' }}>{hint}</small>
+          </div>
+        ))}
       </section>
-
       <div className="panel">
-        <div className="panel-header" style={{ alignItems: 'center' }}>
-          <div><h2>Fuel & Expense Breakdown</h2><p>Per-trip fuel and cash advance summary</p></div>
-          <button className="icon-create" onClick={handleDownloadExcel} title="Download Excel (.xlsx)" aria-label="Download Excel">
-            <DownloadSimple size={18} />
-          </button>
-        </div>
-        <div className="filters" style={{ flexWrap: 'wrap' }}>
-          <div className="search"><MagnifyingGlass size={16} style={{ color: '#9ca6b4', marginRight: 4 }} /><input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search trip ID, driver, truck..." /></div>
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                {['Trip', 'Driver', 'Truck', 'Fuel Authorized', 'Fuel Recorded', 'Cash Advance', 'Extra Fuel'].map(h =>
-                  <th key={h} style={{ textAlign: 'left', padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRows.map(row => (
-                <tr key={row.trip} style={{ borderBottom: '1px solid #f8fafc' }}>
-                  <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontSize: '0.75rem', color: '#64748b' }}>{row.trip}</td>
-                  <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{row.driver}</td>
-                  <td style={{ padding: '0.75rem 1rem', color: '#475569', fontFamily: 'monospace', fontSize: '0.75rem' }}>{row.truck}</td>
-                  <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{row.fuelAuth}</td>
-                  <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{row.fuelRec}</td>
-                  <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{row.cash}</td>
-                  <td style={{ padding: '0.75rem 1rem' }}>{row.extraFuel ? <span style={{ color: '#d97706', fontWeight: 600 }}>Yes</span> : <span style={{ color: '#94a3b8' }}>No</span>}</td>
-                </tr>
-              ))}
-              {filteredRows.length === 0 && <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>No records match the filters.</td></tr>}
-            </tbody>
-          </table>
-        </div>
+        <div className="panel-header" style={{ alignItems: 'center' }}><div><h2>Fuel &amp; Expense Breakdown</h2><p>Per-trip fuel and cash advance summary</p></div><button className="icon-create" onClick={handleDownloadExcel} title="Download Excel (.xlsx)" aria-label="Download Excel"><DownloadSimple size={18} /></button></div>
+        <div className="filters" style={{ flexWrap: 'wrap' }}><div className="search"><MagnifyingGlass size={16} style={{ color: '#9ca6b4', marginRight: 4 }} /><input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search trip ID, driver, truck..." /></div></div>
+        <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}><thead><tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>{['Trip', 'Driver', 'Truck', 'Fuel Authorized', 'Fuel Recorded', 'Cash Advance', 'Extra Fuel'].map((h) => <th key={h} style={{ textAlign: 'left', padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>)}</tr></thead><tbody>{filteredRows.map((row) => (<tr key={row.trip} style={{ borderBottom: '1px solid #f8fafc' }}><td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontSize: '0.75rem', color: '#64748b' }}>{row.trip}</td><td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{row.driver}</td><td style={{ padding: '0.75rem 1rem', color: '#475569', fontFamily: 'monospace', fontSize: '0.75rem' }}>{row.truck}</td><td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{row.fuelAuth}</td><td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{row.fuelRec}</td><td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{row.cash}</td><td style={{ padding: '0.75rem 1rem' }}>{row.extraFuel ? <span style={{ color: '#d97706', fontWeight: 600 }}>Yes</span> : <span style={{ color: '#94a3b8' }}>No</span>}</td></tr>))}{filteredRows.length === 0 && <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>No records match the filters.</td></tr>}</tbody></table></div>
       </div>
-
-      <div className="panel">
-        <div className="panel-header"><div><h2>Fuel Authorized vs Recorded</h2><p>Planned vs actual consumption comparison</p></div></div>
-        <div style={{ padding: '0 1rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {[
-            { label: 'Authorized', value: totalAuth, color: '#3b82f6' },
-            { label: 'Recorded', value: totalRec, color: '#10b981' },
-          ].map(bar => (
-            <div key={bar.label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 64px', alignItems: 'center', gap: '0.75rem' }}>
-              <span style={{ fontSize: '0.8125rem', color: '#475569', fontWeight: 500 }}>{bar.label}</span>
-              <div style={{ background: '#f1f5f9', borderRadius: 9999, height: 14, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${Math.round((bar.value / maxFuel) * 100)}%`, background: bar.color, borderRadius: 9999, transition: 'width 0.4s ease' }} />
-              </div>
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b', textAlign: 'right' }}>{bar.value} L</span>
-            </div>
-          ))}
-          <p style={{ fontSize: '0.8125rem', color: '#64748b', marginTop: '0.25rem' }}>
-            Variance: <strong style={{ color: totalAuth - totalRec > 0 ? '#ef4444' : '#10b981' }}>
-              {totalAuth - totalRec > 0 ? '−' : '+'}{Math.abs(totalAuth - totalRec)} L
-            </strong> {totalAuth - totalRec > 0 ? 'under recorded vs authorized' : 'over recorded vs authorized'}.
-          </p>
-        </div>
-      </div>
+      <div className="panel"><div className="panel-header"><div><h2>Fuel Authorized vs Recorded</h2><p>Planned vs actual consumption comparison</p></div></div><div style={{ padding: '0 1rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>{[{ label: 'Authorized', value: totalAuth, color: '#3b82f6' }, { label: 'Recorded', value: totalRec, color: '#10b981' }].map((bar) => (<div key={bar.label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 64px', alignItems: 'center', gap: '0.75rem' }}><span style={{ fontSize: '0.8125rem', color: '#475569', fontWeight: 500 }}>{bar.label}</span><div style={{ background: '#f1f5f9', borderRadius: 9999, height: 14, overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.round((bar.value / maxFuel) * 100)}%`, background: bar.color, borderRadius: 9999, transition: 'width 0.4s ease' }} /></div><span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b', textAlign: 'right' }}>{bar.value} L</span></div>))}<p style={{ fontSize: '0.8125rem', color: '#64748b', marginTop: '0.25rem' }}>Variance: <strong style={{ color: totalAuth - totalRec > 0 ? '#ef4444' : '#10b981' }}>{totalAuth - totalRec > 0 ? '−' : '+'}{Math.abs(totalAuth - totalRec)} L</strong> {totalAuth - totalRec > 0 ? 'under recorded vs authorized' : 'over recorded vs authorized'}.</p></div></div>
     </div>
   )
 }
+
+// ─── FollowupsPage ────────────────────────────────────────────────────────────
 
 function FollowupsPage({ followups, trips, defaultTripFilter, onClearDefaultFilter, onCall, onOpenTrip, onCreate }: { followups: Followup[]; trips: Trip[]; defaultTripFilter?: string; onClearDefaultFilter?: () => void; onCall: (fu: Followup) => void; onOpenTrip: (tripId: string) => void; onCreate: () => void }) {
   const [query, setQuery] = useState('')
@@ -1017,61 +1048,25 @@ function FollowupsPage({ followups, trips, defaultTripFilter, onClearDefaultFilt
   const tripOptions = ['All', ...Array.from(new Set(followups.map((f) => f.tripRef)))]
   useEffect(() => { if (defaultTripFilter) { setTripFilter(defaultTripFilter); onClearDefaultFilter?.() } }, [defaultTripFilter])
   const parseDue = (fu: Followup) => { try { const months: Record<string, number> = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 }; const p = fu.dueDate.trim().split(' '); return new Date(Number(p[2]), months[p[1]] ?? 0, Number(p[0]), Number(fu.dueTime.split(':')[0] ?? '0'), Number(fu.dueTime.split(':')[1] ?? '0')).getTime() } catch { return 0 } }
-  const filtered = followups
-    .filter((f) => (tripFilter === 'All' || f.tripRef === tripFilter) && (statusFilter === 'All' || f.status === statusFilter))
-    .filter((f) => { const q = query.toLowerCase(); return !q || f.driver.toLowerCase().includes(q) || f.tripRef.toLowerCase().includes(q) || f.note.toLowerCase().includes(q) })
-    .sort((a, b) => sortAsc ? parseDue(a) - parseDue(b) : parseDue(b) - parseDue(a))
+  const filtered = followups.filter((f) => (tripFilter === 'All' || f.tripRef === tripFilter) && (statusFilter === 'All' || f.status === statusFilter)).filter((f) => { const q = query.toLowerCase(); return !q || f.driver.toLowerCase().includes(q) || f.tripRef.toLowerCase().includes(q) || f.note.toLowerCase().includes(q) }).sort((a, b) => sortAsc ? parseDue(a) - parseDue(b) : parseDue(b) - parseDue(a))
   const activeFilters = (tripFilter !== 'All' ? 1 : 0) + (statusFilter !== 'All' ? 1 : 0)
   return (
     <section className="panel list-panel">
-      <div className="panel-header">
-        <div><h2>Follow-ups</h2><p>Field communication and driver follow-up log.</p></div>
-        <div className="panel-header-actions">
-          <button className="icon-create" aria-label="New follow-up" title="New follow-up" onClick={onCreate}><Plus size={16} /></button>
-        </div>
-      </div>
+      <div className="panel-header"><div><h2>Follow-ups</h2><p>Field communication and driver follow-up log.</p></div><div className="panel-header-actions"><button className="icon-create" aria-label="New follow-up" title="New follow-up" onClick={onCreate}><Plus size={16} /></button></div></div>
       <div className="filters" style={{ position: 'relative', flexWrap: 'wrap', gap: 8 }}>
         <div className="search" style={{ flex: 1, minWidth: 180 }}><MagnifyingGlass size={16} style={{ color: '#9ca6b4', marginRight: 4 }} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search driver, trip, note" /></div>
-        <button className="icon-create" title="Filter" aria-label="Filter" onClick={() => setShowFilters((v) => !v)} style={{ position: 'relative' }}>
-          <WarningCircle size={15} />
-          {activeFilters > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: 'var(--blue)', color: 'white', borderRadius: '50%', width: 14, height: 14, fontSize: 8, display: 'grid', placeItems: 'center', fontWeight: 700 }}>{activeFilters}</span>}
-        </button>
-        <button className="icon-create" title={sortAsc ? 'Sort: oldest due first' : 'Sort: newest due first'} aria-label="Sort" onClick={() => setSortAsc((v) => !v)}>
-          <ArrowRight size={15} style={{ transform: sortAsc ? 'rotate(90deg)' : 'rotate(-90deg)', transition: 'transform .2s' }} />
-        </button>
-        {showFilters && (
-          <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: '14px 16px', zIndex: 5, minWidth: 220, boxShadow: '0 8px 24px rgb(24 34 48 / 10%)' }}>
-            <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: 'var(--muted-ink)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Trip</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>{tripOptions.map((t) => <button key={t} className={tripFilter === t ? 'filter active' : 'filter'} style={{ fontSize: 10 }} onClick={() => setTripFilter(t)}>{t}</button>)}</div>
-            <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: 'var(--muted-ink)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Status</p>
-            <div style={{ display: 'flex', gap: 4 }}>{['All', 'Open', 'Done'].map((s) => <button key={s} className={statusFilter === s ? 'filter active' : 'filter'} style={{ fontSize: 10 }} onClick={() => setStatusFilter(s)}>{s}</button>)}</div>
-          </div>
-        )}
+        <button className="icon-create" title="Filter" aria-label="Filter" onClick={() => setShowFilters((v) => !v)} style={{ position: 'relative' }}><WarningCircle size={15} />{activeFilters > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: 'var(--blue)', color: 'white', borderRadius: '50%', width: 14, height: 14, fontSize: 8, display: 'grid', placeItems: 'center', fontWeight: 700 }}>{activeFilters}</span>}</button>
+        <button className="icon-create" title={sortAsc ? 'Sort: oldest due first' : 'Sort: newest due first'} aria-label="Sort" onClick={() => setSortAsc((v) => !v)}><ArrowRight size={15} style={{ transform: sortAsc ? 'rotate(90deg)' : 'rotate(-90deg)', transition: 'transform .2s' }} /></button>
+        {showFilters && (<div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: '14px 16px', zIndex: 5, minWidth: 220, boxShadow: '0 8px 24px rgb(24 34 48 / 10%)' }}><p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: 'var(--muted-ink)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Trip</p><div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>{tripOptions.map((t) => <button key={t} className={tripFilter === t ? 'filter active' : 'filter'} style={{ fontSize: 10 }} onClick={() => setTripFilter(t)}>{t}</button>)}</div><p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: 'var(--muted-ink)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Status</p><div style={{ display: 'flex', gap: 4 }}>{['All', 'Open', 'Done'].map((s) => <button key={s} className={statusFilter === s ? 'filter active' : 'filter'} style={{ fontSize: 10 }} onClick={() => setStatusFilter(s)}>{s}</button>)}</div></div>)}
       </div>
-      {filtered.map((fu) => (
-        <div key={fu.id} className="extra-row" style={{ alignItems: 'flex-start', gap: 12, padding: '14px 0' }}>
-          <span className="extra-icon" style={{ marginTop: 2 }}><Clock size={15} /></span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <b style={{ fontSize: 11 }}>{fu.driver}</b>
-              <button className="text-button" style={{ fontSize: 10, padding: 0 }} onClick={() => onOpenTrip(fu.tripId)}>{fu.tripRef} <CaretRight size={10} style={{ display: 'inline' }} /></button>
-              <span className={`status ${fu.status.toLowerCase()}`} style={{ fontSize: 9 }}>{fu.status}</span>
-            </div>
-            <p style={{ fontSize: 10, color: 'var(--muted-ink)', margin: '4px 0 0', lineHeight: 1.5 }}>{fu.note}</p>
-            <small style={{ color: '#9ca6b4', fontSize: 9, display: 'block', marginTop: 4 }}>Due {fu.dueDate} · {to12Hour(fu.dueTime)}</small>
-          </div>
-          <a href={`tel:${fu.driverPhone}`} onClick={(e) => { e.preventDefault(); onCall(fu) }} className="button secondary compact" style={{ fontSize: 11, flexShrink: 0 }} aria-label={`Call ${fu.driver}`} title={`Call ${fu.driver}`}>
-            <span style={{ fontSize: 14 }}>📞</span> Call
-          </a>
-        </div>
-      ))}
+      {filtered.map((fu) => (<div key={fu.id} className="extra-row" style={{ alignItems: 'flex-start', gap: 12, padding: '14px 0' }}><span className="extra-icon" style={{ marginTop: 2 }}><Clock size={15} /></span><div style={{ flex: 1, minWidth: 0 }}><div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><b style={{ fontSize: 11 }}>{fu.driver}</b><button className="text-button" style={{ fontSize: 10, padding: 0 }} onClick={() => onOpenTrip(fu.tripId)}>{fu.tripRef} <CaretRight size={10} style={{ display: 'inline' }} /></button><span className={`status ${fu.status.toLowerCase()}`} style={{ fontSize: 9 }}>{fu.status}</span></div><p style={{ fontSize: 10, color: 'var(--muted-ink)', margin: '4px 0 0', lineHeight: 1.5 }}>{fu.note}</p><small style={{ color: '#9ca6b4', fontSize: 9, display: 'block', marginTop: 4 }}>Due {fu.dueDate} · {to12Hour(fu.dueTime)}</small></div><a href={`tel:${fu.driverPhone}`} onClick={(e) => { e.preventDefault(); onCall(fu) }} className="button secondary compact" style={{ fontSize: 11, flexShrink: 0 }} aria-label={`Call ${fu.driver}`} title={`Call ${fu.driver}`}><span style={{ fontSize: 14 }}>📞</span> Call</a></div>))}
       {!filtered.length && <Empty label="No follow-ups match" />}
     </section>
   )
 }
 
 function FollowupModal({ trips, onClose, onCreate }: { trips: Trip[]; onClose: () => void; onCreate: (data: Omit<Followup, 'id' | 'createdAt' | 'status'>) => void }) {
-  const activeTripOptions = trips.filter((t) => t.tripStatus !== 'Completed')
+  const activeTripOptions = trips.filter((t) => t.status !== 'TRIP_COMPLETED')
   const [tripId, setTripId] = useState(activeTripOptions[0]?.id || '')
   const selectedTrip = trips.find((t) => t.id === tripId)
   const [note, setNote] = useState('')
@@ -1097,40 +1092,13 @@ function FollowupModal({ trips, onClose, onCreate }: { trips: Trip[]; onClose: (
 function FuelTransactionsPage({ transactions, onSendToPump, onResend }: { transactions: FuelTransaction[]; onSendToPump: (tx: FuelTransaction) => void; onResend: (tx: FuelTransaction) => void }) {
   const [statusFilter, setStatusFilter] = useState('All')
   const [query, setQuery] = useState('')
-  const filtered = transactions.filter((tx) => {
-    const matchesStatus = statusFilter === 'All' || tx.status === statusFilter
-    const q = query.toLowerCase()
-    const matchesQuery = !q || tx.tripRef.toLowerCase().includes(q) || tx.driver.toLowerCase().includes(q) || tx.station.toLowerCase().includes(q)
-    return matchesStatus && matchesQuery
-  })
+  const filtered = transactions.filter((tx) => { const matchesStatus = statusFilter === 'All' || tx.status === statusFilter; const q = query.toLowerCase(); const matchesQuery = !q || tx.tripRef.toLowerCase().includes(q) || tx.driver.toLowerCase().includes(q) || tx.station.toLowerCase().includes(q); return matchesStatus && matchesQuery })
   return (
     <section className="panel list-panel">
-      <div className="panel-header">
-        <div><h2>Fuel transactions</h2><p>Dispatch fuel authorisations to pump stations.</p></div>
-      </div>
-      <div className="filters">
-        <div className="search"><MagnifyingGlass size={16} style={{ color: '#9ca6b4', marginRight: 4 }} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search trip, driver, station" /></div>
-        <div className="filter-group">{['All', 'Pending', 'Sent', 'Resent'].map((f) => <button key={f} className={statusFilter === f ? 'filter active' : 'filter'} onClick={() => setStatusFilter(f)}>{f}</button>)}</div>
-      </div>
-      {filtered.map((tx) => (
-        <div key={tx.id} className="extra-row" style={{ alignItems: 'center' }}>
-          <span className="extra-icon"><GasPump size={15} /></span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <b style={{ fontSize: 11, display: 'block' }}>{tx.tripRef} · {tx.driver}</b>
-            <small style={{ color: 'var(--muted-ink)', fontSize: 10, display: 'block', marginTop: 3 }}>{tx.station} · {tx.litres}</small>
-          </div>
-          <strong style={{ fontSize: 11, marginLeft: 'auto', flexShrink: 0 }}>{tx.amount}</strong>
-          <span className={`status ${tx.status.toLowerCase()}`} style={{ marginLeft: 10 }}>{tx.status}</span>
-          {tx.status === 'Pending' && (
-            <button className="button primary compact" style={{ marginLeft: 10, fontSize: 11 }} onClick={() => onSendToPump(tx)}>Send to pump</button>
-          )}
-          {(tx.status === 'Sent' || tx.status === 'Resent') && (
-            <button className="button secondary compact" style={{ marginLeft: 10, fontSize: 11 }} onClick={() => onResend(tx)}>Resend</button>
-          )}
-        </div>
-      ))}
+      <div className="panel-header"><div><h2>Fuel transactions</h2><p>Dispatch fuel authorisations to pump stations.</p></div></div>
+      <div className="filters"><div className="search"><MagnifyingGlass size={16} style={{ color: '#9ca6b4', marginRight: 4 }} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search trip, driver, station" /></div><div className="filter-group">{['All', 'Pending', 'Sent', 'Resent'].map((f) => <button key={f} className={statusFilter === f ? 'filter active' : 'filter'} onClick={() => setStatusFilter(f)}>{f}</button>)}</div></div>
+      {filtered.map((tx) => (<div key={tx.id} className="extra-row" style={{ alignItems: 'center' }}><span className="extra-icon"><GasPump size={15} /></span><div style={{ flex: 1, minWidth: 0 }}><b style={{ fontSize: 11, display: 'block' }}>{tx.tripRef} · {tx.driver}</b><small style={{ color: 'var(--muted-ink)', fontSize: 10, display: 'block', marginTop: 3 }}>{tx.station} · {tx.litres}</small></div><strong style={{ fontSize: 11, marginLeft: 'auto', flexShrink: 0 }}>{tx.amount}</strong><span className={`status ${tx.status.toLowerCase()}`} style={{ marginLeft: 10 }}>{tx.status}</span>{tx.status === 'Pending' && <button className="button primary compact" style={{ marginLeft: 10, fontSize: 11 }} onClick={() => onSendToPump(tx)}>Send to pump</button>}{(tx.status === 'Sent' || tx.status === 'Resent') && <button className="button secondary compact" style={{ marginLeft: 10, fontSize: 11 }} onClick={() => onResend(tx)}>Resend</button>}</div>))}
       {!filtered.length && <Empty label="No fuel transactions found" />}
     </section>
   )
 }
-
