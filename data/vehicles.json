@@ -1,0 +1,82 @@
+[
+  {
+    "truck_id": "MH13AB4721",
+    "brand": "Tata Motors",
+    "model_name": "Tata Prima 4928.S",
+    "BS6": "yes",
+    "tires_count": 12,
+    "mileage_kmpl": 3.8,
+    "load_capacity": "25 Tons",
+    "type": "Body"
+  },
+  {
+    "truck_id": "MH13XY8892",
+    "brand": "Ashok Leyland",
+    "model_name": "Ashok Leyland 3118",
+    "BS6": "no",
+    "tires_count": 10,
+    "mileage_kmpl": 4.2,
+    "load_capacity": "20 Tons",
+    "type": "Body"
+  },
+  {
+    "truck_id": "MH09FY9095",
+    "brand": "Volvo",
+    "model_name": "Volvo FMX 460",
+    "BS6": "yes",
+    "tires_count": 10,
+    "mileage_kmpl": 3.5,
+    "load_capacity": "30 Tons",
+    "type": "Bulker"
+  },
+  {
+    "truck_id": "MH12GH3341",
+    "brand": "BharatBenz",
+    "model_name": "BharatBenz 3523R",
+    "BS6": "yes",
+    "tires_count": 12,
+    "mileage_kmpl": 4.0,
+    "load_capacity": "22 Tons",
+    "type": "Body"
+  },
+  {
+    "truck_id": "MH04KL7723",
+    "brand": "Eicher",
+    "model_name": "Eicher Pro 6049",
+    "BS6": "yes",
+    "tires_count": 10,
+    "mileage_kmpl": 4.5,
+    "load_capacity": "15 Tons",
+    "type": "Body"
+  },
+  {
+    "truck_id": "MH06MN2256",
+    "brand": "Tata Motors",
+    "model_name": "Tata LPT 3118",
+    "BS6": "no",
+    "tires_count": 10,
+    "mileage_kmpl": 4.1,
+    "load_capacity": "18 Tons",
+    "type": "Bulker"
+  },
+  {
+    "truck_id": "MH21PQ5588",
+    "brand": "Mahindra",
+    "model_name": "Mahindra Blazo X 40",
+    "BS6": "yes",
+    "tires_count": 16,
+    "mileage_kmpl": 3.2,
+    "load_capacity": "35 Tons",
+    "type": "Bulker"
+  },
+  {
+    "truck_id": "MH14RS1190",
+    "brand": "Scania",
+    "model_name": "Scania P 360 B",
+    "BS6": "yes",
+    "tires_count": 16,
+    "mileage_kmpl": 3.0,
+    "load_capacity": "40 Tons",
+    "type": "Bulker"
+  }
+]

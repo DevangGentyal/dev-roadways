@@ -44,6 +44,8 @@ type CashDetails = { advance: string; paymentMode: 'Cash' | 'UPI' }
 type TripDocument = { id: string; name: string; type: 'LR' | 'WB' | 'Invoice' | 'Other'; uploadedAt: string }
 type Followup = { id: string; tripId: string; tripRef: string; driver: string; driverPhone: string; note: string; dueDate: string; dueTime: string; createdAt: string; status: 'Open' | 'Done' }
 type FuelTransaction = { id: string; tripId: string; tripRef: string; driver: string; station: string; amount: string; litres: string; status: 'Pending' | 'Sent' | 'Resent' }
+type Driver = { id: string; name: string; phone_number: number; truck_id: string; status: 'available' | 'unavailable'; source_location: string; documents: unknown[] }
+type Vehicle = { truck_id: string; brand: string; model_name: string; BS6: 'yes' | 'no'; tires_count: number; mileage_kmpl: number; load_capacity: string; type: 'Body' | 'Bulker' | 'Open' }
 
 const seedRequests: Request[] = [
   { id: 'req-1048', reference: 'DR-1048', customer: 'Ultratech Cement', origin: 'Wadgaon, Pune', destination: 'Nashik MIDC', date: '18 Aug 2026', time: '08:30', createdAt: '16 Aug 2026 · 10:15 AM', passengers: 28, status: 'Pending' },
@@ -59,10 +61,12 @@ export default function OpsDashboard() {
   const [trips, setTrips] = useState<Trip[]>([])
   const [followups, setFollowups] = useState<Followup[]>([])
   const [fuelTransactions, setFuelTransactions] = useState<FuelTransaction[]>([])
+  const [drivers, setDrivers] = useState<Driver[]>([])
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [dbReady, setDbReady] = useState(false)
   const [dbError, setDbError] = useState('')
-  useEffect(() => { fetch('/api/mock-db').then((response) => { if (!response.ok) throw new Error('Mock database unavailable'); return response.json() }).then((data) => { setRequests(data.requests); setTrips(data.trips); setFollowups(data.followups || []); setFuelTransactions(data.fuelTransactions || []); setDbReady(true) }).catch(() => setDbError('Unable to load mock database')) }, [])
-  async function persist(collection: 'requests' | 'trips' | 'extras' | 'documents' | 'followups' | 'fuel-transactions', data: unknown) { const response = await fetch('/api/mock-db', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ collection, data }) }); if (!response.ok) throw new Error('Mock database write failed'); return response.json() }
+  useEffect(() => { fetch('/api/mock-db').then((response) => { if (!response.ok) throw new Error('Mock database unavailable'); return response.json() }).then((data) => { setRequests(data.requests); setTrips(data.trips); setFollowups(data.followups || []); setFuelTransactions(data.fuelTransactions || []); setDrivers(data.drivers || []); setVehicles(data.vehicles || []); setDbReady(true) }).catch(() => setDbError('Unable to load mock database')) }, [])
+  async function persist(collection: 'requests' | 'trips' | 'extras' | 'documents' | 'followups' | 'fuel-transactions' | 'drivers', data: unknown) { const response = await fetch('/api/mock-db', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ collection, data }) }); if (!response.ok) throw new Error('Mock database write failed'); return response.json() }
   const [view, setView] = useState('dashboard')
   const [selected, setSelected] = useState<Request | Trip | null>(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -72,6 +76,7 @@ export default function OpsDashboard() {
   const [showFollowup, setShowFollowup] = useState(false)
   const [followupTripFilter, setFollowupTripFilter] = useState('')
   const [editTarget, setEditTarget] = useState<Request | Trip | null>(null)
+  const [acceptPendingRequest, setAcceptPendingRequest] = useState<Request | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [toast, setToast] = useState('')
 
@@ -81,14 +86,32 @@ export default function OpsDashboard() {
   const visibleTrips = role === 'Driver' ? trips.filter((t) => t.driver === 'Ramesh Yadav') : trips
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2800) }
 
-  function acceptRequest(request: Request, driver = 'Ramesh Yadav') {
-    const updated = { ...request, status: 'Accepted' as RequestStatus, driver, driverNumber: 'DRV-021' }
+  function acceptRequest(request: Request, driverObj?: Driver) {
+    const driverName = driverObj?.name
+    const driverId = driverObj?.id ?? ''
+    const updated = { ...request, status: 'Accepted' as RequestStatus, driver: driverName, driverNumber: driverId }
+    const vehicleRecord = driverObj ? vehicles.find((v) => v.truck_id === driverObj.truck_id) : undefined
     const nextRequests = requests.map((item) => item.id === request.id ? updated : item)
-    const nextTrips = [...trips.filter((item) => item.id !== request.id), { ...updated, tripStatus: 'Scheduled' as TripStatus, pickupDate: request.date, pickupTime: request.time, estimatedDropDate: request.date, estimatedDropTime: request.time, cargo: { material: 'Cement', company: request.customer, quantity: '28 tonnes', loadType: 'Bagged' as const }, truck: { number: 'Pending assignment', type: 'Body' as const, configuration: '12 tyre' as const, brand: 'Tata Motors' }, fuel: { assigned: '120 L', received: 'Awaiting receipt', station: 'To be assigned', fulfilledAt: 'Not fulfilled' }, cash: { advance: '₹0', paymentMode: 'UPI' as const }, documents: [], extras: [] }]
-    setRequests(nextRequests); setTrips(nextTrips); void Promise.all([persist('requests', nextRequests), persist('trips', nextTrips)]); setSelected(updated); notify(`${request.reference} accepted and trip created`)
+    const nextTrips = [...trips.filter((item) => item.id !== request.id), { ...updated, tripStatus: 'Scheduled' as TripStatus, pickupDate: request.date, pickupTime: request.time, estimatedDropDate: request.date, estimatedDropTime: request.time, cargo: { material: request.cargoMaterial || 'Cement', company: request.customer, quantity: request.cargoWeight || '28 tonnes', loadType: (request.cargoType ?? 'Bagged') as 'Bagged' | 'Loose' }, truck: { number: driverObj?.truck_id || 'Pending assignment', type: (vehicleRecord?.type === 'Bulker' ? 'Open' : 'Body') as 'Body' | 'Open', configuration: `${vehicleRecord?.tires_count ?? 12} tyre` as '10 tyre' | '12 tyre' | '14 tyre' | '16 tyre', brand: vehicleRecord?.brand || 'Tata Motors' }, fuel: { assigned: '120 L', received: 'Awaiting receipt', station: 'To be assigned', fulfilledAt: 'Not fulfilled' }, cash: { advance: '₹0', paymentMode: 'UPI' as const }, documents: [], extras: [] }]
+    setRequests(nextRequests)
+    setTrips(nextTrips)
+    if (driverObj) {
+      const nextDrivers = drivers.map((d) => d.id === driverObj.id ? { ...d, status: 'unavailable' as const } : d)
+      setDrivers(nextDrivers)
+      void persist('drivers', nextDrivers)
+    }
+    void Promise.all([persist('requests', nextRequests), persist('trips', nextTrips)])
+    setSelected(updated)
+    notify(`${request.reference} accepted${driverObj ? ` · ${driverObj.name} assigned` : ''}`)
   }
   function rejectRequest(request: Request) { const next = requests.map((item) => item.id === request.id ? { ...item, status: 'Rejected' as RequestStatus } : item); setRequests(next); void persist('requests', next); setSelected({ ...request, status: 'Rejected' }); notify(`${request.reference} rejected`) }
-  function addRequest(data: Request) { const next = [data, ...requests]; setRequests(next); void persist('requests', next); setShowCreate(false); notify('Trip request created') }
+  function addRequest(data: Request) {
+    const next = [data, ...requests]
+    setRequests(next)
+    void persist('requests', next)
+    setShowCreate(false)
+    notify('Trip request created')
+  }
   function sendReminder(request: Request) { notify(`Reminder sent to Operations for ${request.reference}`) }
   async function updateEntity(data: Partial<Request>) { if (!editTarget) return; const updated = { ...editTarget, ...data }; const nextRequests = requests.map((item) => item.id === updated.id ? { ...item, ...data } : item); const nextTrips = trips.map((item) => item.id === updated.id ? { ...item, ...data, pickupDate: data.date || item.pickupDate, pickupTime: data.time || item.pickupTime } : item); setRequests(nextRequests); setTrips(nextTrips); setSelected(updated); await persist('requests', nextRequests); if ('tripStatus' in updated) await persist('trips', nextTrips); setEditTarget(null); notify(`${updated.reference} updated`) }
   function createFollowup(data: Omit<Followup, 'id' | 'createdAt' | 'status'>) { const now = new Date(); const ts = `${now.getDate()} ${now.toLocaleString('en-GB', { month: 'short' })} ${now.getFullYear()} · ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`; const followup: Followup = { ...data, id: `fu-${Date.now()}`, createdAt: ts, status: 'Open' }; const next = [followup, ...followups]; setFollowups(next); void persist('followups', next); setShowFollowup(false); notify('Follow-up created') }
@@ -166,7 +189,7 @@ export default function OpsDashboard() {
 
             {view === 'dashboard' && role !== 'Driver' && <Dashboard pending={pending} accepted={accepted} requests={requests} trips={trips} onOpen={(r) => { setSelected(r); setView('request-detail') }} onOpenTrip={(t) => { setSelected(t); setView('trip-detail') }} onViewAll={() => setView('trips')} onViewAllRequests={() => setView('requests')} />}
             {view === 'requests' && role !== 'Driver' && <RequestList requests={visibleRequests} onOpen={(r) => { setSelected(r); setView('request-detail') }} onCreate={() => setShowCreate(true)} onImport={() => setShowImport(true)} />}
-            {view === 'request-detail' && selected && <RequestDetail request={selected as Request} role={role} onBack={() => setView('requests')} onAccept={acceptRequest} onReject={rejectRequest} onReminder={() => sendReminder(selected as Request)} onEdit={() => { if (role !== 'Driver') setEditTarget(selected as Request) }} />}
+            {view === 'request-detail' && selected && <RequestDetail request={selected as Request} role={role} drivers={drivers} vehicles={vehicles} onBack={() => setView('requests')} onAccept={(r) => setAcceptPendingRequest(r)} onReject={rejectRequest} onReminder={() => sendReminder(selected as Request)} onEdit={() => { if (role !== 'Driver') setEditTarget(selected as Request) }} />}
             {view === 'trips' && <TripList trips={visibleTrips} onOpen={(t) => { setSelected(t); setView('trip-detail') }} />}
             {view === 'trip-detail' && selected && <><TripDetail trip={selected as Trip} role={role} onBack={() => setView('trips')} onExtra={() => setShowExtra(true)} onDocument={() => setShowDocument(true)} onEdit={() => { if (role !== 'Driver') setEditTarget(selected as Trip) }} onFollowup={role === 'Operations' ? () => { setFollowupTripFilter((selected as Trip).reference); setView('followups') } : undefined} /></>}
             {view === 'followups' && role === 'Operations' && <FollowupsPage followups={followups} trips={trips} defaultTripFilter={followupTripFilter} onClearDefaultFilter={() => setFollowupTripFilter('')} onCall={(fu) => { window.location.href = `tel:${fu.driverPhone}` }} onOpenTrip={(tripId) => { const t = trips.find((x) => x.id === tripId); if (t) { setSelected(t); setView('trip-detail') } }} onCreate={() => setShowFollowup(true)} />}
@@ -220,7 +243,8 @@ export default function OpsDashboard() {
     {showExtra && <ExtraModal onClose={() => setShowExtra(false)} onCreate={addExtra} />}
     {showDocument && <DocumentModal onClose={() => setShowDocument(false)} onCreate={addDocument} />}
     {showFollowup && <FollowupModal trips={trips} onClose={() => setShowFollowup(false)} onCreate={createFollowup} />}
-    {editTarget && <EditModal entity={editTarget} onClose={() => setEditTarget(null)} onSave={updateEntity} />}
+    {editTarget && <EditModal entity={editTarget} drivers={drivers} vehicles={vehicles} role={role} onClose={() => setEditTarget(null)} onSave={updateEntity} />}
+    {acceptPendingRequest && <AssignDriverModal request={acceptPendingRequest} drivers={drivers} vehicles={vehicles} onClose={() => setAcceptPendingRequest(null)} onConfirm={(driver) => { void acceptRequest(acceptPendingRequest, driver); setAcceptPendingRequest(null) }} />}
   </div>
 }
 
@@ -333,7 +357,12 @@ function RequestList({ requests, onOpen, onCreate, onImport }: { requests: Reque
   )
 }
 
-function RequestDetail({ request, role, onBack, onAccept, onReject, onReminder, onEdit }: { request: Request; role: Role; onBack: () => void; onAccept: (r: Request) => void; onReject: (r: Request) => void; onReminder: () => void; onEdit: () => void }) {
+function RequestDetail({ request, role, drivers, vehicles, onBack, onAccept, onReject, onReminder, onEdit }: { request: Request; role: Role; drivers: Driver[]; vehicles: Vehicle[]; onBack: () => void; onAccept: (r: Request) => void; onReject: (r: Request) => void; onReminder: () => void; onEdit: () => void }) {
+  // Only Operations can see driver/truck details
+  const canSeeDriver = role !== 'Coordinator'
+  const driverRecord = canSeeDriver ? (drivers.find((d) => d.id === request.driverNumber) ?? null) : null
+  const vehicleRecord = driverRecord ? (vehicles.find((v) => v.truck_id === driverRecord.truck_id) ?? null) : null
+
   return (
     <section className="detail">
       <button className="back" onClick={onBack}><ArrowLeft size={16} style={{ display: 'inline', marginRight: 4 }} /> Back to requests</button>
@@ -360,8 +389,56 @@ function RequestDetail({ request, role, onBack, onAccept, onReject, onReminder, 
           </div>
           {role === 'Coordinator' && request.status !== 'Accepted' && <button className="button secondary wide" onClick={onReminder}>Send reminder to Operations</button>}
         </div>
-        {request.driver && <div className="panel action-panel"><h2>Assigned driver</h2><div className="assigned"><b>{request.driver}</b><span>{request.driverNumber}</span></div></div>}
-        {role === 'Operations' && request.status === 'Pending' && <div className="panel action-panel"><h2>Review</h2><button className="button primary wide" onClick={() => onAccept(request)}>Accept request</button><button className="button danger wide" onClick={() => onReject(request)}>Reject request</button></div>}
+
+        {/* Operations: review panel — Accept opens the AssignDriverModal */}
+        {role === 'Operations' && request.status === 'Pending' && (
+          <div className="panel action-panel">
+            <h2 style={{ marginBottom: 12 }}>Review</h2>
+            <p style={{ fontSize: 12, color: 'var(--muted-ink)', marginBottom: 14 }}>Accept to proceed to driver assignment, or reject the request.</p>
+            <button className="button primary wide" onClick={() => onAccept(request)}>Accept request</button>
+            <button className="button danger wide" onClick={() => onReject(request)}>Reject request</button>
+          </div>
+        )}
+
+        {/* Assigned driver — visible to Operations only, after approval */}
+        {canSeeDriver && request.status === 'Accepted' && request.driver && (
+          <div className="panel action-panel">
+            <h2 style={{ marginBottom: 12 }}>Assigned driver</h2>
+            <div className="assigned" style={{ marginBottom: 12 }}>
+              <span>
+                <b style={{ fontSize: 13 }}>{driverRecord?.name ?? request.driver}</b>
+                <small style={{ display: 'block', marginTop: 2 }}>{driverRecord ? driverRecord.phone_number : request.driverNumber}</small>
+              </span>
+            </div>
+            {driverRecord && (
+              <div className="info-grid compact-grid">
+                <Info label="Driver ID" value={driverRecord.id} />
+                <Info label="Truck ID" value={driverRecord.truck_id} />
+                <Info label="Base location" value={driverRecord.source_location} />
+                <Info label="Status" value={driverRecord.status === 'unavailable' ? 'On trip' : 'Available'} />
+              </div>
+            )}
+            {!driverRecord && <Info label="Driver ID" value={request.driverNumber ?? '—'} />}
+          </div>
+        )}
+
+        {/* Assigned truck — visible to Operations only, after approval */}
+        {canSeeDriver && request.status === 'Accepted' && vehicleRecord && (
+          <div className="panel action-panel">
+            <h2 style={{ marginBottom: 12 }}>Assigned truck</h2>
+            <div style={{ marginBottom: 12 }}>
+              <b style={{ fontSize: 13 }}>{vehicleRecord.brand} {vehicleRecord.model_name}</b>
+              <small style={{ display: 'block', color: 'var(--muted-ink)', marginTop: 2 }}>{vehicleRecord.truck_id}</small>
+            </div>
+            <div className="info-grid compact-grid">
+              <Info label="Type" value={vehicleRecord.type} />
+              <Info label="Tyres" value={`${vehicleRecord.tires_count} tyres`} />
+              <Info label="Load capacity" value={vehicleRecord.load_capacity} />
+              <Info label="Mileage" value={`${vehicleRecord.mileage_kmpl} km/L`} />
+              <Info label="BS6 compliant" value={vehicleRecord.BS6 === 'yes' ? 'Yes' : 'No'} />
+            </div>
+          </div>
+        )}
       </div>
     </section>
   )
@@ -424,7 +501,7 @@ function InfoSection({ title, children }: { title: string; children: React.React
 function DriverDetails({ trip }: { trip: Trip }) { return <section className="panel driver-details-panel"><InfoSection title="Driver details"><Info label="Driver name" value={trip.driver || 'Unassigned'} /><Info label="Phone number" value={trip.driverNumber || 'Not available'} /></InfoSection></section> }
 function Empty({ label }: { label: string }) { return <div className="empty">{label}</div> }
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) { return <div className="modal-backdrop"><div className="modal"><div className="modal-header"><h2>{title}</h2><button onClick={onClose} aria-label="Close"><X size={18} /></button></div>{children}</div></div> }
-function EditModal({ entity, onClose, onSave }: { entity: Request | Trip; onClose: () => void; onSave: (data: Partial<Request>) => void }) {
+function EditModal({ entity, drivers, vehicles, role, onClose, onSave }: { entity: Request | Trip; drivers: Driver[]; vehicles: Vehicle[]; role: Role; onClose: () => void; onSave: (data: Partial<Request>) => void }) {
   const [reference, setReference] = useState(entity.reference)
   const [customer, setCustomer] = useState(entity.customer)
   const [origin, setOrigin] = useState(entity.origin)
@@ -435,9 +512,13 @@ function EditModal({ entity, onClose, onSave }: { entity: Request | Trip; onClos
   const [cargoWeight, setCargoWeight] = useState(entity.cargoWeight || '')
   const [cargoType, setCargoType] = useState<Request['cargoType']>(entity.cargoType || 'Bagged')
   const [noOfBags, setNoOfBags] = useState(entity.noOfBags || '')
+  // Driver selection — only for Operations
+  const [selectedDriverId, setSelectedDriverId] = useState(entity.driverNumber ?? '')
+  const selectedDriver = role !== 'Coordinator' ? (drivers.find((d) => d.id === selectedDriverId) ?? null) : null
+  const selectedVehicle = selectedDriver ? (vehicles.find((v) => v.truck_id === selectedDriver.truck_id) ?? null) : null
   return (
     <Modal title={`Edit ${'tripStatus' in entity ? 'trip' : 'request'}`} onClose={onClose}>
-      <form onSubmit={(e) => { e.preventDefault(); const { date, time } = fromDatetimeLocal(pickupDT); const { date: dDate, time: dTime } = fromDatetimeLocal(deliveryDT); onSave({ reference, customer, origin, destination, date, time, requestedDeliveryDate: dDate, requestedDeliveryTime: dTime, cargoMaterial, cargoWeight, cargoType, noOfBags, passengers: Number(noOfBags) || entity.passengers }) }}>
+      <form onSubmit={(e) => { e.preventDefault(); const { date, time } = fromDatetimeLocal(pickupDT); const { date: dDate, time: dTime } = fromDatetimeLocal(deliveryDT); onSave({ reference, customer, origin, destination, date, time, requestedDeliveryDate: dDate, requestedDeliveryTime: dTime, cargoMaterial, cargoWeight, cargoType, noOfBags, passengers: Number(noOfBags) || entity.passengers, ...(role !== 'Coordinator' && { driver: selectedDriver?.name ?? entity.driver, driverNumber: selectedDriverId || entity.driverNumber }) }) }}>
         <label>Reference<input value={reference} onChange={(e) => setReference(e.target.value)} /></label>
         <label>Customer<input value={customer} onChange={(e) => setCustomer(e.target.value)} /></label>
         <div className="form-row"><label>Pickup<input value={origin} onChange={(e) => setOrigin(e.target.value)} /></label><label>Drop-off<input value={destination} onChange={(e) => setDestination(e.target.value)} /></label></div>
@@ -446,11 +527,74 @@ function EditModal({ entity, onClose, onSave }: { entity: Request | Trip; onClos
         <label>Material<input value={cargoMaterial} onChange={(e) => setCargoMaterial(e.target.value)} /></label>
         <div className="form-row"><label>Cargo weight<input value={cargoWeight} onChange={(e) => setCargoWeight(e.target.value)} placeholder="28 tonnes" /></label><label>Cargo type<select value={cargoType} onChange={(e) => setCargoType(e.target.value as Request['cargoType'])}><option value="Bagged">Bagged</option><option value="Loose">Loose</option></select></label></div>
         <label>No. of bags<input value={noOfBags} onChange={(e) => setNoOfBags(e.target.value)} placeholder="560 bags" /></label>
+        {role !== 'Coordinator' && (
+          <div style={{ borderTop: '1px solid var(--line)', paddingTop: 14, marginTop: 4 }}>
+            <label style={{ display: 'block', marginBottom: 6 }}>Assigned driver
+              <select value={selectedDriverId} onChange={(e) => setSelectedDriverId(e.target.value)} style={{ marginTop: 6 }}>
+                <option value="">— Unassigned —</option>
+                {drivers.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} · {d.source_location} · {d.truck_id}{d.status === 'unavailable' ? ' (on trip)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectedDriver && (
+              <div style={{ marginTop: 8 }}>
+                <div className="info-grid compact-grid" style={{ marginBottom: 10 }}>
+                  <Info label="Phone" value={String(selectedDriver.phone_number)} />
+                  <Info label="Base location" value={selectedDriver.source_location} />
+                  <Info label="Status" value={selectedDriver.status === 'unavailable' ? 'On trip' : 'Available'} />
+                </div>
+                {selectedVehicle && (
+                  <>
+                    <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted-ink)', textTransform: 'uppercase', letterSpacing: '.07em', margin: '10px 0 6px' }}>Truck</p>
+                    <div style={{ background: 'var(--surface-alt, #f8fafc)', border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px' }}>
+                      <b style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>{selectedVehicle.brand} {selectedVehicle.model_name}</b>
+                      <div className="info-grid compact-grid">
+                        <Info label="Truck ID" value={selectedVehicle.truck_id} />
+                        <Info label="Type" value={selectedVehicle.type} />
+                        <Info label="Tyres" value={`${selectedVehicle.tires_count} tyres`} />
+                        <Info label="Capacity" value={selectedVehicle.load_capacity} />
+                        <Info label="Mileage" value={`${selectedVehicle.mileage_kmpl} km/L`} />
+                        <Info label="BS6" value={selectedVehicle.BS6 === 'yes' ? 'Yes' : 'No'} />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         <button className="button primary wide" type="submit">Save changes</button>
       </form>
     </Modal>
   )
 }
+function extractCity(location: string): string {
+  // Take the last comma-separated segment as the city (e.g. "Hotgi Road, Solapur" → "solapur")
+  const parts = location.split(',')
+  return parts[parts.length - 1].trim().toLowerCase()
+}
+function scoreDriverForOrigin(driver: Driver, origin: string): number {
+  if (!origin.trim()) return 0
+  const originTokens = origin.toLowerCase().split(/[\s,]+/).filter((w) => w.length > 2)
+  const locTokens = driver.source_location.toLowerCase().split(/[\s,]+/).filter((w) => w.length > 2)
+  return originTokens.reduce((score, ow) => score + (locTokens.some((lw) => lw.includes(ow) || ow.includes(lw)) ? 1 : 0), 0)
+}
+function scoreDriverForCity(driver: Driver, origin: string): number {
+  // City-level: exact match of last comma-segment scores highest (3), then token-level match
+  const originCity = extractCity(origin)
+  const driverCity = extractCity(driver.source_location)
+  if (originCity && (driverCity.includes(originCity) || originCity.includes(driverCity))) return 3
+  return scoreDriverForOrigin(driver, origin)
+}
+function findBestDriver(origin: string, drivers: Driver[]): Driver | null {
+  const available = drivers.filter((d) => d.status === 'available')
+  if (!available.length) return null
+  return available.reduce((best, d) => scoreDriverForOrigin(d, origin) > scoreDriverForOrigin(best, origin) ? d : best, available[0])
+}
+
 function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (r: Request) => void }) {
   const [reference, setReference] = useState('')
   const [customer, setCustomer] = useState('')
@@ -482,6 +626,84 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (r:
         <button className="button primary wide" type="submit">Create request</button>
       </form>
     </Modal>
+  )
+}
+function AssignDriverModal({ request, drivers, vehicles, onClose, onConfirm }: { request: Request; drivers: Driver[]; vehicles: Vehicle[]; onClose: () => void; onConfirm: (driver?: Driver) => void }) {
+  const originCity = extractCity(request.origin)
+  const scored = drivers
+    .map((d) => ({ driver: d, score: scoreDriverForCity(d, request.origin), vehicle: vehicles.find((v) => v.truck_id === d.truck_id) ?? null }))
+    .sort((a, b) => {
+      const aAvail = a.driver.status === 'available' ? 1 : 0
+      const bAvail = b.driver.status === 'available' ? 1 : 0
+      if (aAvail !== bAvail) return bAvail - aAvail
+      return b.score - a.score
+    })
+  const suggested = scored.find((s) => s.driver.status === 'available') ?? null
+  const [selectedId, setSelectedId] = useState(suggested?.driver.id ?? '')
+  const selectedEntry = scored.find((s) => s.driver.id === selectedId) ?? null
+  return (
+    <div className="modal-backdrop">
+      <div className="modal" style={{ maxWidth: 460 }}>
+        <div className="modal-header">
+          <div>
+            <h2 style={{ marginBottom: 2 }}>Assign driver</h2>
+            <p style={{ fontSize: 11, color: 'var(--muted-ink)', margin: 0 }}>{request.reference} &middot; Pickup: {request.origin}</p>
+          </div>
+          <button onClick={onClose} aria-label="Close"><X size={18} /></button>
+        </div>
+        {originCity && (
+          <div style={{ padding: '0 20px 12px' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, background: 'var(--blue-soft)', color: 'var(--blue)', borderRadius: 20, padding: '4px 10px' }}>
+              Matching drivers in <b style={{ textTransform: 'capitalize', marginLeft: 3 }}>{originCity}</b>
+            </span>
+          </div>
+        )}
+        <div style={{ padding: '0 20px', maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          {scored.map(({ driver, score, vehicle }) => {
+            const isSelected = driver.id === selectedId
+            const isSuggested = driver.id === suggested?.driver.id
+            const isAvailable = driver.status === 'available'
+            return (
+              <button key={driver.id} type="button" onClick={() => { if (isAvailable) setSelectedId(driver.id) }}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, border: `1.5px solid ${isSelected ? 'var(--blue)' : 'var(--line)'}`, background: isSelected ? 'var(--blue-soft)' : 'var(--panel)', cursor: isAvailable ? 'pointer' : 'not-allowed', opacity: isAvailable ? 1 : 0.5, textAlign: 'left', width: '100%' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <b style={{ fontSize: 12 }}>{driver.name}</b>
+                    {isSuggested && isAvailable && <span style={{ fontSize: 9, fontWeight: 700, background: isSelected ? 'var(--blue)' : 'var(--blue-soft)', color: isSelected ? '#fff' : 'var(--blue)', borderRadius: 4, padding: '1px 6px', textTransform: 'uppercase', letterSpacing: '.05em' }}>Suggested</span>}
+                    {!isAvailable && <span style={{ fontSize: 9, fontWeight: 700, background: '#fee2e2', color: '#991b1b', borderRadius: 4, padding: '1px 6px', textTransform: 'uppercase', letterSpacing: '.05em' }}>On trip</span>}
+                  </div>
+                  <p style={{ fontSize: 10, color: 'var(--muted-ink)', margin: 0 }}>{driver.source_location}</p>
+                  {vehicle && <p style={{ fontSize: 10, color: 'var(--muted-ink)', margin: '1px 0 0' }}>{vehicle.brand} {vehicle.model_name} &middot; {driver.truck_id}</p>}
+                </div>
+                {score >= 3 && isAvailable && <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--blue)', flexShrink: 0 }}>City match</span>}
+                {isSelected && <Check size={14} style={{ color: 'var(--blue)', flexShrink: 0 }} />}
+              </button>
+            )
+          })}
+          {!scored.length && <p style={{ color: 'var(--muted-ink)', fontSize: 12, textAlign: 'center', padding: 16 }}>No drivers found</p>}
+        </div>
+        {selectedEntry?.vehicle && (
+          <div style={{ margin: '0 20px 16px', background: 'var(--surface-alt, #f8fafc)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px 12px' }}>
+            <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted-ink)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '0 0 8px' }}>Assigned truck</p>
+            <b style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>{selectedEntry.vehicle.brand} {selectedEntry.vehicle.model_name}</b>
+            <div className="info-grid compact-grid">
+              <Info label="Truck ID" value={selectedEntry.vehicle.truck_id} />
+              <Info label="Type" value={selectedEntry.vehicle.type} />
+              <Info label="Tyres" value={`${selectedEntry.vehicle.tires_count} tyres`} />
+              <Info label="Capacity" value={selectedEntry.vehicle.load_capacity} />
+              <Info label="Mileage" value={`${selectedEntry.vehicle.mileage_kmpl} km/L`} />
+              <Info label="BS6" value={selectedEntry.vehicle.BS6 === 'yes' ? 'Yes' : 'No'} />
+            </div>
+          </div>
+        )}
+        <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button className="button primary wide" disabled={!selectedId} onClick={() => onConfirm(selectedEntry?.driver ?? undefined)}>
+            {selectedId ? `Assign ${selectedEntry?.driver.name ?? ''} & Accept` : 'Select a driver to continue'}
+          </button>
+          <button className="button secondary wide" onClick={() => onConfirm(undefined)}>Accept without driver</button>
+        </div>
+      </div>
+    </div>
   )
 }
 function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) { return <Modal title="Import requests" onClose={onClose}><div className="upload"><UploadSimple size={24} style={{ color: 'var(--blue)' }} /><b>Drop your Excel file here</b><p>or choose a .xlsx file from your device</p><button className="button secondary">Choose file</button></div><div className="import-preview"><b>Preview ready</b><span>2 valid requests · 0 errors</span></div><button className="button primary wide" onClick={onDone}>Validate and import</button></Modal> }
