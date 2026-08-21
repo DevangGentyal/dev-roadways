@@ -101,10 +101,16 @@ type Trip = {
 
 type Extra = {
   id: string;
-  type: "Fuel" | "Cash" | "AdBlue";
+  tripId?: string;
+  tripRef?: string;
+  driver?: string;
+  type: "Fuel" | "Cash" | "AdBlue" | "Other";
   amount: string;
+  litres?: string;
   note: string;
-  status: "Submitted" | "Approved";
+  status: "Submitted" | "Approved" | "Rejected";
+  requestedAt?: string;
+  approvedAt?: string;
 };
 type Cargo = {
   material: string;
@@ -160,12 +166,16 @@ type FuelTransaction = {
 type Driver = {
   id: string;
   name: string;
-  phone: string;
-  vehicleId: string;
+  phone?: string;
+  phone_number?: number | string;
+  vehicleId?: string;
+  truck_id?: string;
   status: "available" | "unavailable";
-  clientId: string;
-  sourceId: string;
-  documents: unknown[];
+  clientId?: string;
+  sourceId?: string;
+  source_location?: string;
+  source_company?: string;
+  documents?: unknown[];
 };
 type Source = { id: string; name: string; address: string };
 type Client = { id: string; name: string; code: string; sources: Source[] };
@@ -338,17 +348,31 @@ export default function OpsDashboard() {
       | "drivers",
     data: unknown,
   ) {
-    const response = await fetch("/api/mock-db", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ collection, data }),
-    });
-    if (!response.ok) throw new Error("Mock database write failed");
-    return response.json();
+    try {
+      const response = await fetch("/api/mock-db", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ collection, data }),
+      });
+      if (!response.ok) {
+        console.warn(`Mock DB write warning for ${collection}`);
+        return { ok: false };
+      }
+      return await response.json();
+    } catch (err) {
+      console.warn(`Mock DB network warning for ${collection}:`, err);
+      return { ok: false };
+    }
   }
 
   const [tripsFilter, setTripsFilter] = useState("All");
   const [view, setView] = useState("dashboard");
+
+  const changeView = (targetView: string) => {
+    setTripsFilter("All");
+    setFollowupTripFilter("");
+    setView(targetView);
+  };
   const [selected, setSelected] = useState<Trip | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -430,7 +454,7 @@ export default function OpsDashboard() {
   };
 
   const isDriverFlowLocked =
-    role === "Driver" && activeDriverFlow !== null && activeDriverFlow.step < 9;
+    role === "Driver" && activeDriverFlow !== null;
 
   const notify = (msg: string) => {
     setToast(msg);
@@ -628,25 +652,37 @@ export default function OpsDashboard() {
     notify(`Fuel resent to pump for ${tx.tripRef}`);
   }
 
-  async function addExtra(data: Extra) {
-    const tripId = selected?.id;
-    if (!tripId) return;
-    const entity = { ...data, tripId };
-    const currentExtras = trips.flatMap((t) =>
-      t.extras.map((e) => ({ ...e, tripId: t.id })),
-    );
-    const nextExtras = [...currentExtras, entity];
-    const result = await persist("extras", nextExtras);
+  async function addExtraForTrip(tripId: string, data: Extra) {
+    const targetTrip = trips.find((t) => t.id === tripId);
+    const now = new Date();
+    const formattedDate = `${now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} · ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+    const entity: Extra = {
+      ...data,
+      tripId,
+      tripRef: data.tripRef || targetTrip?.reference || tripId,
+      driver: data.driver || targetTrip?.driver || role || "Ramesh Yadav",
+      status: data.status || "Submitted",
+      requestedAt: data.requestedAt || formattedDate,
+    };
+    const result = await persist("extras", [entity]);
     const hydratedTrip = result.trip as Trip | undefined;
     const next = trips.map((t) =>
       t.id === tripId
-        ? { ...t, extras: hydratedTrip?.extras || [...t.extras, data] }
+        ? { ...t, extras: hydratedTrip?.extras || [...t.extras, entity] }
         : t,
     );
     setTrips(next);
-    setSelected(next.find((t) => t.id === tripId) || selected);
+    if (selected?.id === tripId) {
+      setSelected(next.find((t) => t.id === tripId) || selected);
+    }
+    notify(`Extra ${data.type} request submitted`);
+  }
+
+  async function addExtra(data: Extra) {
+    const tripId = selected?.id;
+    if (!tripId) return;
+    await addExtraForTrip(tripId, data);
     setShowExtra(false);
-    notify(`${data.type} request submitted`);
   }
 
   async function addDocument(data: TripDocument) {
@@ -659,7 +695,7 @@ export default function OpsDashboard() {
       trip_Id: data.trip_Id || targetTrip?.reference || tripId,
     };
     const result = await persist("documents", [entity]);
-    const hydratedTrip = result.trip as Trip | undefined;
+    const hydratedTrip = result && "trip" in result ? (result.trip as Trip | undefined) : undefined;
     const next = trips.map((t) => {
       if (t.id !== tripId) return t;
       const updatedDocs = hydratedTrip?.documents || [...t.documents, data];
@@ -679,7 +715,7 @@ export default function OpsDashboard() {
       trip_Id: data.trip_Id || targetTrip?.reference || tripId,
     };
     const result = await persist("documents", [entity]);
-    const hydratedTrip = result.trip as Trip | undefined;
+    const hydratedTrip = result && "trip" in result ? (result.trip as Trip | undefined) : undefined;
     const next = trips.map((t) => {
       if (t.id !== tripId) return t;
       const updatedDocs = hydratedTrip?.documents || [...t.documents, data];
@@ -702,21 +738,25 @@ export default function OpsDashboard() {
       trip_Id: d.trip_Id || targetTrip?.reference || tripId,
     }));
     const result = await persist("documents", entities);
-    const hydratedTrip = result.trip as Trip | undefined;
+    const hydratedTrip = result && "trip" in result ? (result.trip as Trip | undefined) : undefined;
     const next = trips.map((t) => {
       if (t.id !== tripId) return t;
+      const existingDocIds = t.documents.map((doc) => doc.id);
+      const newDocs = docs.filter((doc) => !existingDocIds.includes(doc.id));
       return {
         ...t,
-        documents: hydratedTrip?.documents || [...t.documents, ...docs],
+        documents: hydratedTrip?.documents || [...t.documents, ...newDocs],
         status: "DOCUMENTS_SUBMITTED" as TripStatus,
       };
     });
     setTrips(next);
     void persist("trips", next);
-    notify("Stamped documents submitted — trip completed!");
+    notify("Stamped documents submitted — waiting for Operations approval");
   }
 
   async function toggleVerifyDoc(tripId: string, docId: string) {
+    const stampedTypes = ["LR (stamped)", "WB (stamped)", "Invoice (stamped)"];
+
     const nextTrips = trips.map((t) => {
       if (t.id !== tripId) return t;
       const updatedDocs = t.documents.map((d) => {
@@ -724,7 +764,18 @@ export default function OpsDashboard() {
         const newStatus = d.status === "verified" ? "uploaded" : "verified";
         return { ...d, status: newStatus };
       });
-      return { ...t, documents: updatedDocs };
+
+      const allStampedVerified = stampedTypes.every((type) =>
+        updatedDocs.some((d) => d.type === type && d.status === "verified"),
+      );
+
+      const newTripStatus = allStampedVerified
+        ? ("COMPLETED" as TripStatus)
+        : t.status === "COMPLETED"
+          ? ("DOCUMENTS_SUBMITTED" as TripStatus)
+          : t.status;
+
+      return { ...t, documents: updatedDocs, status: newTripStatus };
     });
 
     setTrips(nextTrips);
@@ -741,6 +792,7 @@ export default function OpsDashboard() {
       })),
     );
     await persist("documents", allDocs);
+    await persist("trips", nextTrips);
 
     const targetDoc = nextTrips
       .find((t) => t.id === tripId)
@@ -785,19 +837,19 @@ export default function OpsDashboard() {
               <NavItem
                 active={view === "dashboard"}
                 label="Overview"
-                onClick={() => setView("dashboard")}
+                onClick={() => changeView("dashboard")}
                 icon={<House size={18} />}
               />
               <NavItem
                 active={view === "reports-ops"}
                 label="Trip Operations"
-                onClick={() => setView("reports-ops")}
+                onClick={() => changeView("reports-ops")}
                 icon={<ChartPie size={18} />}
               />
               <NavItem
                 active={view === "reports-fuel"}
                 label="Fuel &amp; Expenses"
-                onClick={() => setView("reports-fuel")}
+                onClick={() => changeView("reports-fuel")}
                 icon={<GasPump size={18} />}
               />
             </>
@@ -807,7 +859,7 @@ export default function OpsDashboard() {
                 active={view === "dashboard"}
                 disabled={isDriverFlowLocked}
                 label="Overview"
-                onClick={() => setView("dashboard")}
+                onClick={() => changeView("dashboard")}
                 icon={<House size={18} />}
               />
               <NavItem
@@ -815,7 +867,7 @@ export default function OpsDashboard() {
                 disabled={isDriverFlowLocked}
                 label="Trips"
                 count={newCount || undefined}
-                onClick={() => setView("trips")}
+                onClick={() => changeView("trips")}
                 icon={<Truck size={18} />}
               />
               {role === "Operations" && (
@@ -826,7 +878,7 @@ export default function OpsDashboard() {
                     followups.filter((f) => f.status === "Open").length ||
                     undefined
                   }
-                  onClick={() => setView("followups")}
+                  onClick={() => changeView("followups")}
                   icon={<Clock size={18} />}
                 />
               )}
@@ -834,7 +886,7 @@ export default function OpsDashboard() {
                 <NavItem
                   active={view === "fuel"}
                   label="Fuel transactions"
-                  onClick={() => setView("fuel")}
+                  onClick={() => changeView("fuel")}
                   icon={<GasPump size={18} />}
                 />
               )}
@@ -847,9 +899,9 @@ export default function OpsDashboard() {
             <span>Help centre</span>
           </div>
           <div className="profile">
-            <span className="avatar">AC</span>
+            <span className="avatar">UN</span>
             <span>
-              <b>Alex Cooper</b>
+              <b>User Name</b>
               <small>{role}</small>
             </span>
             <span className="more">
@@ -883,11 +935,7 @@ export default function OpsDashboard() {
                 value={role}
                 onChange={(e) => {
                   setRole(e.target.value as Role);
-                  setView(
-                    e.target.value === "Super Admin"
-                      ? "dashboard"
-                      : "dashboard",
-                  );
+                  changeView("dashboard");
                 }}
                 aria-label="Select role"
               >
@@ -953,6 +1001,9 @@ export default function OpsDashboard() {
                       onAddDocument={(doc) =>
                         addDocumentForTrip(activeTrip.id, doc)
                       }
+                      onAddExtra={(extraData) =>
+                        addExtraForTrip(activeTrip.id, extraData)
+                      }
                       onStartTrip={startTrip}
                       onReachTrip={reachTrip}
                       onSubmitStampedDocs={(docs) =>
@@ -1004,6 +1055,7 @@ export default function OpsDashboard() {
                       onImport={() => setShowImport(true)}
                       filter={tripsFilter}
                       setFilter={setTripsFilter}
+                      view={view}
                     />
                   )}
                 </>
@@ -1012,7 +1064,7 @@ export default function OpsDashboard() {
                 <TripDetail
                   trip={selected}
                   role={role}
-                  onBack={() => setView("trips")}
+                  onBack={() => changeView("trips")}
                   onExtra={() => setShowExtra(true)}
                   onDocument={() => {
                     setDocPurpose("regular");
@@ -1024,9 +1076,9 @@ export default function OpsDashboard() {
                   onFollowup={
                     role === "Operations"
                       ? () => {
-                          setFollowupTripFilter(selected.reference);
-                          setView("followups");
-                        }
+                        setFollowupTripFilter(selected.reference);
+                        setView("followups");
+                      }
                       : undefined
                   }
                   onApprove={(t) => setApprovePendingTrip(t)}
@@ -1066,6 +1118,7 @@ export default function OpsDashboard() {
                     }
                   }}
                   onCreate={() => setShowFollowup(true)}
+                  view={view}
                 />
               )}
               {view === "fuel" && role !== "Driver" && (
@@ -1073,6 +1126,7 @@ export default function OpsDashboard() {
                   transactions={fuelTransactions}
                   onSendToPump={sendToPump}
                   onResend={resendToPump}
+                  view={view}
                 />
               )}
               {view === "reports-ops" && (
@@ -1130,7 +1184,7 @@ export default function OpsDashboard() {
                     active={view === "dashboard"}
                     label="Overview"
                     onClick={() => {
-                      setView("dashboard");
+                      changeView("dashboard");
                       setMobileNavOpen(false);
                     }}
                     icon={<House size={18} />}
@@ -1139,7 +1193,7 @@ export default function OpsDashboard() {
                     active={view === "reports-ops"}
                     label="Trip Operations"
                     onClick={() => {
-                      setView("reports-ops");
+                      changeView("reports-ops");
                       setMobileNavOpen(false);
                     }}
                     icon={<ChartPie size={18} />}
@@ -1148,7 +1202,7 @@ export default function OpsDashboard() {
                     active={view === "reports-fuel"}
                     label="Fuel &amp; Expenses"
                     onClick={() => {
-                      setView("reports-fuel");
+                      changeView("reports-fuel");
                       setMobileNavOpen(false);
                     }}
                     icon={<GasPump size={18} />}
@@ -1160,7 +1214,7 @@ export default function OpsDashboard() {
                     active={view === "dashboard"}
                     label="Overview"
                     onClick={() => {
-                      setView("dashboard");
+                      changeView("dashboard");
                       setMobileNavOpen(false);
                     }}
                     icon={<House size={18} />}
@@ -1170,7 +1224,7 @@ export default function OpsDashboard() {
                     label="Trips"
                     count={newCount || undefined}
                     onClick={() => {
-                      setView("trips");
+                      changeView("trips");
                       setMobileNavOpen(false);
                     }}
                     icon={<Truck size={18} />}
@@ -1184,7 +1238,7 @@ export default function OpsDashboard() {
                         undefined
                       }
                       onClick={() => {
-                        setView("followups");
+                        changeView("followups");
                         setMobileNavOpen(false);
                       }}
                       icon={<Clock size={18} />}
@@ -1195,7 +1249,7 @@ export default function OpsDashboard() {
                       active={view === "fuel"}
                       label="Fuel transactions"
                       onClick={() => {
-                        setView("fuel");
+                        changeView("fuel");
                         setMobileNavOpen(false);
                       }}
                       icon={<GasPump size={18} />}
@@ -1210,9 +1264,9 @@ export default function OpsDashboard() {
                 <span>Help centre</span>
               </div>
               <div className="profile">
-                <span className="avatar">AC</span>
+                <span className="avatar">UN</span>
                 <span>
-                  <b>Alex Cooper</b>
+                  <b>User Name</b>
                   <small>{role}</small>
                 </span>
               </div>
@@ -1635,6 +1689,7 @@ function TripList({
   onImport,
   filter,
   setFilter,
+  view,
 }: {
   trips: Trip[];
   role: Role;
@@ -1643,6 +1698,7 @@ function TripList({
   onImport: () => void;
   filter: string;
   setFilter: (f: string) => void;
+  view?: string;
 }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -1653,6 +1709,17 @@ function TripList({
   const [draftStatus, setDraftStatus] = useState("All");
   const [draftDateFrom, setDraftDateFrom] = useState("");
   const [draftDateTo, setDraftDateTo] = useState("");
+
+  useEffect(() => {
+    setQuery("");
+    setStatusFilter("All");
+    setDateFrom("");
+    setDateTo("");
+    setDraftStatus("All");
+    setDraftDateFrom("");
+    setDraftDateTo("");
+    setShowFilters(false);
+  }, [view]);
   const statusPriority: Record<string, number> = {
     NEW: 0,
     DRIVER_PENDING: 1,
@@ -2063,10 +2130,16 @@ function TripList({
 
 function DocumentPreviewModal({
   doc,
+  tripRef,
+  role,
   onClose,
+  onToggleVerify,
 }: {
   doc: TripDocument;
+  tripRef?: string;
+  role?: Role;
   onClose: () => void;
+  onToggleVerify?: () => void;
 }) {
   return (
     <div className="modal-backdrop" style={{ zIndex: 1100 }}>
@@ -2267,10 +2340,10 @@ function TripDetail({
           }}
         >
           <h2>Journey</h2>
-          <div className="journey journey-times">
-            <div>
+          <div className="journey journey-times" style={{ display: "flex", alignItems: "flex-start", gap: 16, width: "100%" }}>
+            <div style={{ flex: 1, minWidth: 0, overflowWrap: "break-word", wordBreak: "break-word" }}>
               <small>Pickup</small>
-              <b>{trip.origin}</b>
+              <b style={{ fontSize: 15, lineHeight: 1.3, wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "normal" }}>{trip.origin}</b>
               <span>
                 <em>Scheduled</em>
                 <b>{trip.pickupDate || trip.date}</b>
@@ -2279,11 +2352,11 @@ function TripDetail({
             </div>
             <ArrowRight
               size={18}
-              style={{ color: "var(--blue)", marginTop: 20 }}
+              style={{ color: "var(--blue)", marginTop: 20, flexShrink: 0 }}
             />
-            <div>
+            <div style={{ flex: 1, minWidth: 0, overflowWrap: "break-word", wordBreak: "break-word" }}>
               <small>Drop-off</small>
-              <b>{trip.destination}</b>
+              <b style={{ fontSize: 15, lineHeight: 1.3, wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "normal" }}>{trip.destination}</b>
               <span>
                 <em>Requested</em>
                 <b>{trip.requestedDeliveryDate || trip.date}</b>
@@ -2394,15 +2467,47 @@ function TripDetail({
                       <GasPump size={16} />
                     ) : extra.type === "Cash" ? (
                       <CurrencyInr size={16} />
-                    ) : (
+                    ) : extra.type === "AdBlue" ? (
                       <Drop size={16} />
+                    ) : (
+                      <DotsThree size={16} />
                     )}
                   </span>
                   <div>
                     <b>Extra {extra.type} request</b>
                     <p>{extra.note}</p>
                   </div>
-                  <strong>{extra.amount}</strong>
+                  <div style={{ textAlign: "right" }}>
+                    <strong>{extra.amount}</strong>
+                    <span
+                      style={{
+                        display: "block",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        marginTop: 2,
+                        padding: "2px 6px",
+                        borderRadius: 8,
+                        background:
+                          extra.status === "Approved"
+                            ? "#dcfce7"
+                            : extra.status === "Rejected"
+                              ? "#fee2e2"
+                              : "#fef3c7",
+                        color:
+                          extra.status === "Approved"
+                            ? "#15803d"
+                            : extra.status === "Rejected"
+                              ? "#b91c1c"
+                              : "#b45309",
+                      }}
+                    >
+                      {extra.status === "Approved"
+                        ? "Approved"
+                        : extra.status === "Rejected"
+                          ? "Rejected"
+                          : "Submitted"}
+                    </span>
+                  </div>
                 </div>
               ))}
               {!trip.extras.length && <Empty label="No extra expenses" />}
@@ -2511,7 +2616,7 @@ function TripDetail({
 
                             {(role === "Operations" ||
                               role === "Super Admin") &&
-                            onToggleVerifyDoc ? (
+                              onToggleVerifyDoc ? (
                               <button
                                 type="button"
                                 className={`button ${isVerified ? "secondary" : "primary"} compact`}
@@ -2558,9 +2663,7 @@ function TripDetail({
                               >
                                 <Check size={16} />
                               </span>
-                            ) : (
-                              <StatusBadge status={doc.status || "COMPLETED"} />
-                            )}
+                            ) : null}
                           </div>
                         </div>
                       );
@@ -2905,19 +3008,19 @@ function TripDetail({
             onToggleVerify={
               onToggleVerifyDoc
                 ? () => {
-                    onToggleVerifyDoc(trip.id, previewDoc.id);
-                    setPreviewDoc((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            status:
-                              prev.status === "verified"
-                                ? "uploaded"
-                                : "verified",
-                          }
-                        : null,
-                    );
-                  }
+                  onToggleVerifyDoc(trip.id, previewDoc.id);
+                  setPreviewDoc((prev) =>
+                    prev
+                      ? {
+                        ...prev,
+                        status:
+                          prev.status === "verified"
+                            ? "uploaded"
+                            : "verified",
+                      }
+                      : null,
+                  );
+                }
                 : undefined
             }
           />
@@ -3232,7 +3335,7 @@ function EditModal({
                   />
                   <Info
                     label="Base location"
-                    value={selectedDriver.source_location}
+                    value={selectedDriver.source_location || "Not specified"}
                   />
                   <Info
                     label="Status"
@@ -3377,8 +3480,8 @@ function AssignDriverModal({
         scoreDriverForSourceId(d, trip.sourceId) +
         scoreDriverForOrigin(d, trip.origin) +
         (trip.cargoCompany &&
-        d.source_company &&
-        normalizeLocation(trip.cargoCompany) ===
+          d.source_company &&
+          normalizeLocation(trip.cargoCompany) ===
           normalizeLocation(d.source_company)
           ? 2
           : 0),
@@ -4461,6 +4564,7 @@ function FollowupsPage({
   onCall,
   onOpenTrip,
   onCreate,
+  view,
 }: {
   followups: Followup[];
   trips: Trip[];
@@ -4469,11 +4573,21 @@ function FollowupsPage({
   onCall: (fu: Followup) => void;
   onOpenTrip: (tripId: string) => void;
   onCreate: () => void;
+  view?: string;
 }) {
   const [query, setQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [tripFilter, setTripFilter] = useState(defaultTripFilter || "All");
   const [statusFilter, setStatusFilter] = useState("All");
+
+  useEffect(() => {
+    setQuery("");
+    setStatusFilter("All");
+    setShowFilters(false);
+    if (!defaultTripFilter) {
+      setTripFilter("All");
+    }
+  }, [view]);
   const [sortAsc, setSortAsc] = useState(true);
   const tripOptions = [
     "All",
@@ -4846,16 +4960,26 @@ function FuelTransactionsPage({
   transactions,
   onSendToPump,
   onResend,
+  view,
 }: {
   transactions: FuelTransaction[];
   onSendToPump: (tx: FuelTransaction) => void;
   onResend: (tx: FuelTransaction) => void;
+  view?: string;
 }) {
   const [statusFilter, setStatusFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    setStatusFilter("All");
+    setQuery("");
+    setDateFrom("");
+    setDateTo("");
+    setShowFilters(false);
+  }, [view]);
   const filtered = transactions.filter((tx) => {
     const matchesStatus = statusFilter === "All" || tx.status === statusFilter;
     const q = query.toLowerCase();
@@ -5070,7 +5194,7 @@ function DriverOverviewSection({
 
   return (
     <div style={{ marginTop: 24 }}>
-      {activeDriverFlow && activeDriverFlow.step < 9 && (
+      {activeDriverFlow && (
         <div
           style={{
             background: "var(--blue-soft, #eff6ff)",
@@ -5181,6 +5305,7 @@ function DriverWorkflow({
   flowState,
   onUpdateFlowState,
   onAddDocument,
+  onAddExtra,
   onStartTrip,
   onReachTrip,
   onSubmitStampedDocs,
@@ -5199,6 +5324,7 @@ function DriverWorkflow({
   };
   onUpdateFlowState: (st: any) => void;
   onAddDocument: (doc: TripDocument) => void;
+  onAddExtra?: (extra: Extra) => void;
   onStartTrip: (t: Trip) => void;
   onReachTrip: (t: Trip) => void;
   onSubmitStampedDocs: (docs: TripDocument[]) => void;
@@ -5206,6 +5332,57 @@ function DriverWorkflow({
 }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState("");
+
+  const [showExtraModal, setShowExtraModal] = useState(false);
+  const [extraType, setExtraType] = useState<"Fuel" | "Cash" | "AdBlue" | "Other">("Fuel");
+  const [extraAmount, setExtraAmount] = useState("");
+  const [extraLitres, setExtraLitres] = useState("");
+  const [extraNote, setExtraNote] = useState("");
+  const [extraError, setExtraError] = useState("");
+  const [extraSuccess, setExtraSuccess] = useState("");
+
+  const handleExtraSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setExtraError("");
+    setExtraSuccess("");
+    if (!extraAmount || isNaN(Number(extraAmount)) || Number(extraAmount) <= 0) {
+      setExtraError("Please enter a valid amount (e.g. 3500)");
+      return;
+    }
+    if ((extraType === "Fuel" || extraType === "AdBlue") && (!extraLitres || isNaN(Number(extraLitres)) || Number(extraLitres) <= 0)) {
+      setExtraError(`Please enter valid litres for extra ${extraType} (e.g. 35)`);
+      return;
+    }
+    if (!extraNote.trim()) {
+      setExtraError("Please provide a reason / note for the extra expense request.");
+      return;
+    }
+
+    const numAmt = Number(extraAmount);
+    const formattedAmount = `₹${numAmt.toLocaleString("en-IN")}`;
+    const formattedLitres = extraLitres ? `${extraLitres.trim()} L` : undefined;
+
+    const extraEntity: Extra = {
+      id: `ex-${Date.now()}`,
+      tripId: trip.id,
+      tripRef: trip.reference,
+      driver: trip.driver || "Ramesh Yadav",
+      type: extraType,
+      amount: formattedAmount,
+      litres: (extraType === "Fuel" || extraType === "AdBlue") ? formattedLitres : undefined,
+      note: extraNote.trim(),
+      status: "Submitted",
+      requestedAt: getTimeString(),
+    };
+
+    if (onAddExtra) {
+      onAddExtra(extraEntity);
+    }
+    setExtraAmount("");
+    setExtraLitres("");
+    setExtraNote("");
+    setShowExtraModal(false);
+  };
 
   const currentStep = flowState.step;
   const stepperRef = useRef<HTMLDivElement | null>(null);
@@ -5882,7 +6059,7 @@ function DriverWorkflow({
             }}
           >
             <img
-              src="/map-preview.png"
+              src="/map.jpeg"
               alt="Trip route map"
               style={{
                 width: "100%",
@@ -5991,6 +6168,228 @@ function DriverWorkflow({
           >
             Reached Destination
           </button>
+
+          {/* Request Extras Button */}
+          <div style={{ marginTop: 24 }}>
+            <button
+              type="button"
+              className="button secondary wide"
+              onClick={() => {
+                setExtraError("");
+                setShowExtraModal(true);
+              }}
+              style={{
+                padding: "12px 18px",
+                fontSize: 14,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
+            >
+              <Plus size={18} /> Request extras
+            </button>
+          </div>
+
+          {/* Request Extras Pop-up Modal */}
+          {showExtraModal && (
+            <Modal title="Request Extra Expense" onClose={() => setShowExtraModal(false)}>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleExtraSubmit(e);
+                }}
+              >
+                <label style={{ display: "block", marginBottom: 14 }}>
+                  <span style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                    Type of extra request *
+                  </span>
+                  <select
+                    value={extraType}
+                    onChange={(e) => setExtraType(e.target.value as "Fuel" | "Cash" | "AdBlue" | "Other")}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      fontSize: 13,
+                      borderRadius: 6,
+                      border: "1px solid var(--line)",
+                      background: "var(--surface)",
+                    }}
+                  >
+                    <option value="Fuel">Fuel</option>
+                    <option value="Cash">Cash</option>
+                    <option value="AdBlue">AdBlue</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </label>
+
+                <div style={{ display: "grid", gridTemplateColumns: (extraType === "Fuel" || extraType === "AdBlue") ? "1fr 1fr" : "1fr", gap: 12, marginBottom: 14 }}>
+                  <label>
+                    <span style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                      Amount (₹) *
+                    </span>
+                    <input
+                      type="number"
+                      placeholder="e.g. 3500"
+                      value={extraAmount}
+                      onChange={(e) => setExtraAmount(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        fontSize: 13,
+                        borderRadius: 6,
+                        border: "1px solid var(--line)",
+                        background: "var(--surface)",
+                      }}
+                    />
+                  </label>
+
+                  {(extraType === "Fuel" || extraType === "AdBlue") && (
+                    <label>
+                      <span style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                        Litres (L) *
+                      </span>
+                      <input
+                        type="number"
+                        placeholder="e.g. 35"
+                        value={extraLitres}
+                        onChange={(e) => setExtraLitres(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          fontSize: 13,
+                          borderRadius: 6,
+                          border: "1px solid var(--line)",
+                          background: "var(--surface)",
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                <label style={{ display: "block", marginBottom: 16 }}>
+                  <span style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                    Reason / Note *
+                  </span>
+                  <textarea
+                    rows={3}
+                    placeholder="Add a detailed note explaining the reason for this extra request..."
+                    value={extraNote}
+                    onChange={(e) => setExtraNote(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      fontSize: 12,
+                      borderRadius: 6,
+                      border: "1px solid var(--line)",
+                      background: "var(--surface)",
+                      resize: "vertical",
+                    }}
+                  />
+                </label>
+
+                {extraError && (
+                  <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 14, fontWeight: 600 }}>
+                    ⚠️ {extraError}
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={() => setShowExtraModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="button primary">
+                    Submit Request
+                  </button>
+                </div>
+              </form>
+            </Modal>
+          )}
+
+          {/* Previously Submitted Requests List */}
+          <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span>Previously Submitted Requests</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted-ink)" }}>
+                {trip.extras?.length || 0} total
+              </span>
+            </h3>
+
+            {trip.extras && trip.extras.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {trip.extras.map((ex) => (
+                  <div
+                    key={ex.id}
+                    style={{
+                      padding: "12px 14px",
+                      borderRadius: 10,
+                      background: "var(--surface-alt, #f8fafc)",
+                      border: "1px solid var(--line)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      fontSize: 12,
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600 }}>
+                        {ex.type === "Fuel" && <GasPump size={16} style={{ color: "var(--blue)" }} />}
+                        {ex.type === "Cash" && <CurrencyInr size={16} style={{ color: "#16a34a" }} />}
+                        {ex.type === "AdBlue" && <Drop size={16} style={{ color: "#0284c7" }} />}
+                        {ex.type === "Other" && <DotsThree size={16} style={{ color: "var(--muted-ink)" }} />}
+                        <span>Extra {ex.type}</span>
+                        <span style={{ color: "var(--muted-ink)", fontWeight: 400 }}>·</span>
+                        <span style={{ color: "var(--ink)", fontWeight: 700 }}>{ex.amount}</span>
+                        {ex.litres && <span style={{ fontSize: 11, color: "var(--muted-ink)" }}>({ex.litres})</span>}
+                      </div>
+                      <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--muted-ink)" }}>{ex.note}</p>
+                      {ex.requestedAt && (
+                        <span style={{ fontSize: 10, color: "var(--muted-ink)", opacity: 0.8, display: "block", marginTop: 2 }}>
+                          Requested: {ex.requestedAt}
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: "4px 10px",
+                        borderRadius: 12,
+                        background:
+                          ex.status === "Approved"
+                            ? "#dcfce7"
+                            : ex.status === "Rejected"
+                              ? "#fee2e2"
+                              : "#fef3c7",
+                        color:
+                          ex.status === "Approved"
+                            ? "#15803d"
+                            : ex.status === "Rejected"
+                              ? "#b91c1c"
+                              : "#b45309",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {ex.status === "Approved"
+                        ? "Approved"
+                        : ex.status === "Rejected"
+                          ? "Rejected"
+                          : "Submitted"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ padding: "16px 12px", textAlign: "center", background: "var(--surface-alt, #f8fafc)", borderRadius: 8, border: "1px dashed var(--line)", fontSize: 12, color: "var(--muted-ink)" }}>
+                No extra expense requests submitted yet.
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -6278,27 +6677,87 @@ function DriverWorkflow({
         </div>
       )}
 
-      {/* Step 9: Completion Screen */}
+      {/* Step 9: Completion / Waiting Screen */}
       {currentStep === 9 && (
         <div className="panel" style={{ padding: 32, textAlign: "center" }}>
           {!stampedDocsVerified ? (
-            <div
-              style={{
-                background: "#fef3c7",
-                border: "1px solid #fcd34d",
-                color: "#92400e",
-                borderRadius: 10,
-                padding: "12px 14px",
-                marginBottom: 16,
-                fontSize: 13,
-                fontWeight: 600,
-                textAlign: "left",
-              }}
-            >
-              Waiting for approval on documents.
-            </div>
-          ) : null}
-          {stampedDocsVerified ? (
+            <>
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: "50%",
+                  background: "#fef3c7",
+                  color: "#b45309",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
+                  boxShadow: "0 0 0 6px #fffbe6",
+                }}
+              >
+                <Clock size={32} />
+              </div>
+              <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20, color: "#92400e" }}>
+                Waiting for Operations Completion Approval
+              </h2>
+
+              {/* Document Verification Checklist Card */}
+              <div
+                style={{
+                  maxWidth: 440,
+                  margin: "0 auto 8px",
+                  padding: 16,
+                  borderRadius: 12,
+                  background: "var(--surface-alt, #f8fafc)",
+                  border: "1px solid var(--line)",
+                  textAlign: "left",
+                }}
+              >
+                <b style={{ fontSize: 12, color: "var(--ink)", display: "block", marginBottom: 12 }}>
+                  Document Verification Status
+                </b>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {stampedDocTypes.map((docType) => {
+                    const docObj = trip.documents.find((d) => d.type === docType);
+                    const isDocVerified = docObj?.status === "verified";
+                    return (
+                      <div
+                        key={docType}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "8px 12px",
+                          borderRadius: 8,
+                          background: "var(--surface)",
+                          border: "1px solid var(--line)",
+                          fontSize: 12,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600 }}>
+                          <FileText size={16} style={{ color: isDocVerified ? "#16a34a" : "var(--blue)" }} />
+                          <span>{docType}</span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: "3px 10px",
+                            borderRadius: 12,
+                            background: isDocVerified ? "#dcfce7" : "#fef3c7",
+                            color: isDocVerified ? "#15803d" : "#b45309",
+                          }}
+                        >
+                          {isDocVerified ? "Verified" : "Pending"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) : (
             <>
               <div
                 style={{
@@ -6311,12 +6770,13 @@ function DriverWorkflow({
                   alignItems: "center",
                   justifyContent: "center",
                   margin: "0 auto 16px",
+                  boxShadow: "0 0 0 6px #f0fdf4",
                 }}
               >
                 <Check size={36} />
               </div>
-              <h2 style={{ fontSize: 20, marginBottom: 8, color: "#15803d" }}>
-                Trip Completed
+              <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8, color: "#15803d" }}>
+                Trip Completed! 🎉
               </h2>
               <p
                 style={{
@@ -6324,54 +6784,25 @@ function DriverWorkflow({
                   color: "var(--muted-ink)",
                   maxWidth: 440,
                   margin: "0 auto 24px",
+                  lineHeight: 1.5,
                 }}
               >
-                All documents for <b>{trip.reference}</b> have been submitted
-                and verified.
+                Continue for more trips!
               </p>
-            </>
-          ) : (
-            <>
-              <div
+              <button
+                type="button"
+                className="button primary"
+                onClick={onCompleteFlow}
                 style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: "50%",
-                  background: "#fef3c7",
-                  color: "#92400e",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  margin: "0 auto 16px",
+                  padding: "12px 28px",
+                  fontSize: 14,
+                  fontWeight: 700,
                 }}
               >
-                <Clock size={32} />
-              </div>
-              <h2 style={{ fontSize: 20, marginBottom: 8, color: "#92400e" }}>
-                Waiting for Approval
-              </h2>
-              <p
-                style={{
-                  fontSize: 13,
-                  color: "var(--muted-ink)",
-                  maxWidth: 440,
-                  margin: "0 auto 24px",
-                }}
-              >
-                Uploaded documents for <b>{trip.reference}</b> are pending
-                Operations verification.
-              </p>
+                Finish
+              </button>
             </>
           )}
-          <button
-            type="button"
-            className="button primary"
-            onClick={onCompleteFlow}
-            disabled={!stampedDocsVerified}
-            style={{ padding: "12px 24px", fontSize: 13 }}
-          >
-            Return to Overview
-          </button>
         </div>
       )}
     </div>

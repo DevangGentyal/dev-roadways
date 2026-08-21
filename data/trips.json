@@ -1,5 +1,225 @@
 [
   {
+    "id": "req-1787344926070",
+    "reference": "DR-9842",
+    "clientId": "client-001",
+    "sourceId": "source-001",
+    "customer": "UltraTech Cement",
+    "origin": "Solapur, Maharashtra",
+    "destination": "Pune",
+    "date": "20 Aug 2026",
+    "time": "09:00",
+    "requestedDeliveryDate": "20 Aug 2026",
+    "requestedDeliveryTime": "09:00",
+    "cargoMaterial": "Cement",
+    "cargoCompany": "UltraTech Cement",
+    "cargoWeight": "",
+    "cargoType": "Bagged",
+    "noOfBags": "1 bag",
+    "createdAt": "22 Aug 2026 · 2:12 AM",
+    "passengers": 1,
+    "status": "COMPLETED",
+    "documents": [
+      "doc-1787345360944-1",
+      "doc-1787345367618-2",
+      "doc-1787345371658-3",
+      "doc-1787345424440-6",
+      "doc-1787345428675-7",
+      "doc-1787345433659-8"
+    ],
+    "extras": [],
+    "driver": "Ramesh Yadav",
+    "driverNumber": "driver-001",
+    "pickupDate": "20 Aug 2026",
+    "pickupTime": "09:00",
+    "estimatedDropDate": "20 Aug 2026",
+    "estimatedDropTime": "09:00",
+    "cargo": {
+      "material": "Cement",
+      "company": "UltraTech Cement",
+      "quantity": "—",
+      "loadType": "Bagged"
+    },
+    "truck": {
+      "number": "Pending assignment",
+      "type": "Body",
+      "configuration": "12 tyre",
+      "brand": "Tata Motors"
+    },
+    "fuel": {
+      "assigned": "120 L",
+      "received": "Awaiting receipt",
+      "station": "To be assigned",
+      "fulfilledAt": "Not fulfilled"
+    },
+    "cash": {
+      "advance": "₹0",
+      "paymentMode": "UPI"
+    }
+  },
+  {
+    "id": "req-1787343841127",
+    "reference": "DR-1231",
+    "clientId": "client-001",
+    "sourceId": "source-001",
+    "customer": "UltraTech Cement",
+    "origin": "Solapur, Maharashtra",
+    "destination": "Nashik MIDC",
+    "date": "20 Aug 2026",
+    "time": "09:00",
+    "requestedDeliveryDate": "20 Aug 2026",
+    "requestedDeliveryTime": "09:00",
+    "cargoMaterial": "Cement",
+    "cargoCompany": "UltraTech Cement",
+    "cargoWeight": "",
+    "cargoType": "Bagged",
+    "noOfBags": "1 bag",
+    "createdAt": "22 Aug 2026 · 1:54 AM",
+    "passengers": 1,
+    "status": "COMPLETED",
+    "documents": [
+      "doc-1787343918695-1",
+      "doc-1787343923919-2",
+      "doc-1787343928374-3",
+      "doc-1787343991293-6",
+      "doc-1787343996307-7",
+      "doc-1787344001897-8"
+    ],
+    "extras": [],
+    "driver": "Ramesh Yadav",
+    "driverNumber": "driver-001",
+    "pickupDate": "20 Aug 2026",
+    "pickupTime": "09:00",
+    "estimatedDropDate": "20 Aug 2026",
+    "estimatedDropTime": "09:00",
+    "cargo": {
+      "material": "Cement",
+      "company": "UltraTech Cement",
+      "quantity": "—",
+      "loadType": "Bagged"
+    },
+    "truck": {
+      "number": "Pending assignment",
+      "type": "Body",
+      "configuration": "12 tyre",
+      "brand": "Tata Motors"
+    },
+    "fuel": {
+      "assigned": "120 L",
+      "received": "Awaiting receipt",
+      "station": "To be assigned",
+      "fulfilledAt": "Not fulfilled"
+    },
+    "cash": {
+      "advance": "₹0",
+      "paymentMode": "UPI"
+    }
+  },
+  {
+    "id": "req-1787341947722",
+    "reference": "DR-1231",
+    "clientId": "client-001",
+    "sourceId": "source-001",
+    "customer": "UltraTech Cement",
+    "origin": "Solapur, Maharashtra",
+    "destination": "Pune",
+    "date": "22 Aug 2026",
+    "time": "22:10",
+    "requestedDeliveryDate": "25 Aug 2026",
+    "requestedDeliveryTime": "22:10",
+    "cargoMaterial": "Cement",
+    "cargoCompany": "UltraTech Cement",
+    "cargoWeight": "50",
+    "cargoType": "Loose",
+    "noOfBags": "1 bag",
+    "createdAt": "22 Aug 2026 · 1:22 AM",
+    "passengers": 1,
+    "status": "COMPLETED",
+    "documents": [
+      "doc-1787342076257-1",
+      "doc-1787342081214-2",
+      "doc-1787342086587-3",
+      "doc-1787343641519-6",
+      "doc-1787343656549-7",
+      "doc-1787343667805-8"
+    ],
+    "extras": [
+      {
+        "id": "ex-1787342856715",
+        "tripId": "req-1787341947722",
+        "tripRef": "DR-1231",
+        "driver": "Ramesh Yadav",
+        "type": "Cash",
+        "amount": "₹1,000",
+        "note": "For daruu",
+        "status": "Submitted",
+        "requestedAt": "22 Aug 2026 · 1:37 AM"
+      },
+      {
+        "id": "ex-1787342900040",
+        "tripId": "req-1787341947722",
+        "tripRef": "DR-1231",
+        "driver": "Ramesh Yadav",
+        "type": "Fuel",
+        "amount": "₹2,000",
+        "litres": "20 L",
+        "note": "abc",
+        "status": "Approved",
+        "requestedAt": "22 Aug 2026 · 1:38 AM"
+      },
+      {
+        "id": "ex-1787343258462",
+        "tripId": "req-1787341947722",
+        "tripRef": "DR-1231",
+        "driver": "Ramesh Yadav",
+        "type": "Other",
+        "amount": "₹2,000",
+        "note": "asda",
+        "status": "Rejected",
+        "requestedAt": "22 Aug 2026 · 1:44 AM"
+      },
+      {
+        "id": "ex-1787343323640",
+        "tripId": "req-1787341947722",
+        "tripRef": "DR-1231",
+        "driver": "Ramesh Yadav",
+        "type": "Other",
+        "amount": "₹200",
+        "note": "sdasfwe",
+        "status": "Submitted",
+        "requestedAt": "22 Aug 2026 · 1:45 AM"
+      }
+    ],
+    "driver": "Ramesh Yadav",
+    "driverNumber": "driver-001",
+    "pickupDate": "22 Aug 2026",
+    "pickupTime": "22:10",
+    "estimatedDropDate": "22 Aug 2026",
+    "estimatedDropTime": "22:10",
+    "cargo": {
+      "material": "Cement",
+      "company": "UltraTech Cement",
+      "quantity": "50",
+      "loadType": "Loose"
+    },
+    "truck": {
+      "number": "Pending assignment",
+      "type": "Body",
+      "configuration": "12 tyre",
+      "brand": "Tata Motors"
+    },
+    "fuel": {
+      "assigned": "120 L",
+      "received": "Awaiting receipt",
+      "station": "To be assigned",
+      "fulfilledAt": "Not fulfilled"
+    },
+    "cash": {
+      "advance": "₹0",
+      "paymentMode": "UPI"
+    }
+  },
+  {
     "id": "req-1787339947906",
     "reference": "DR-888",
     "clientId": "client-002",
