@@ -1,16 +1,65 @@
 [
   {
-    "id": "doc-1",
-    "tripId": "req-1046",
-    "name": "DR-1046-LR.pdf",
+    "id": "doc-1787296208700-1",
+    "name": "100 days of py.jpg",
     "type": "LR",
-    "uploadedAt": "17 Aug 2026 · 13:35"
+    "uploadedAt": "21 Aug 2026 · 12:40 PM",
+    "trip_Id": "DR-100",
+    "status": "verified",
+    "tripId": "req-1787296148464"
   },
   {
-    "id": "doc-1786894023028",
-    "name": "Devang_Gentyal_AI_VIT.pdf",
+    "id": "doc-1787296213039-2",
+    "name": "100 days of py.jpg",
+    "type": "WB",
+    "uploadedAt": "21 Aug 2026 · 12:40 PM",
+    "trip_Id": "DR-100",
+    "status": "verified",
+    "tripId": "req-1787296148464"
+  },
+  {
+    "id": "doc-1787296217132-3",
+    "name": "100 days of py.jpg",
+    "type": "Invoice",
+    "uploadedAt": "21 Aug 2026 · 12:40 PM",
+    "trip_Id": "DR-100",
+    "status": "verified",
+    "tripId": "req-1787296148464"
+  },
+  {
+    "id": "doc-1787296208700-1",
+    "name": "100 days of py.jpg",
     "type": "LR",
-    "uploadedAt": "Just now",
-    "tripId": "req-1046"
+    "uploadedAt": "21 Aug 2026 · 12:40 PM",
+    "trip_Id": "DR-100",
+    "status": "verified",
+    "tripId": "req-1787296148464"
+  },
+  {
+    "id": "doc-1787296213039-2",
+    "name": "100 days of py.jpg",
+    "type": "WB",
+    "uploadedAt": "21 Aug 2026 · 12:40 PM",
+    "trip_Id": "DR-100",
+    "status": "verified",
+    "tripId": "req-1787296148464"
+  },
+  {
+    "id": "doc-1787296217132-3",
+    "name": "100 days of py.jpg",
+    "type": "Invoice",
+    "uploadedAt": "21 Aug 2026 · 12:40 PM",
+    "trip_Id": "DR-100",
+    "status": "verified",
+    "tripId": "req-1787296148464"
+  },
+  {
+    "id": "doc-1787296657931-8",
+    "name": "100 days of py.jpg",
+    "type": "Invoice (stamped)",
+    "uploadedAt": "21 Aug 2026 · 12:47 PM",
+    "trip_Id": "DR-1332",
+    "status": "uploaded",
+    "tripId": "req-1787296575358"
   }
 ]

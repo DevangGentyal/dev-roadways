@@ -4,7 +4,7 @@
     "name": "Ramesh Yadav",
     "phone_number": 9876543210,
     "truck_id": "MH13AB4721",
-    "status": "unavailable",
+    "status": "available",
     "source_location": "Solapur MIDC, Solapur",
     "documents": []
   },
@@ -13,7 +13,7 @@
     "name": "Suresh Kumar",
     "phone_number": 9823456701,
     "truck_id": "MH13XY8892",
-    "status": "unavailable",
+    "status": "available",
     "source_location": "Mohol MIDC, Solapur",
     "documents": []
   },
@@ -22,7 +22,7 @@
     "name": "Mahesh Patil",
     "phone_number": 9765432189,
     "truck_id": "MH09FY9095",
-    "status": "unavailable",
+    "status": "available",
     "source_location": "Hotgi Road, Solapur",
     "documents": []
   },
@@ -40,7 +40,7 @@
     "name": "Prakash Shinde",
     "phone_number": 9745612380,
     "truck_id": "MH04KL7723",
-    "status": "unavailable",
+    "status": "available",
     "source_location": "Akkalkot Road, Solapur",
     "documents": []
   },
@@ -49,7 +49,7 @@
     "name": "Vijay Tiwari",
     "phone_number": 9934561270,
     "truck_id": "MH06MN2256",
-    "status": "unavailable",
+    "status": "available",
     "source_location": "Kurduwadi Junction, Solapur",
     "documents": []
   },
