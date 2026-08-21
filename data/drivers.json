@@ -1,74 +1,74 @@
 [
   {
-    "id": "drv-001",
+    "id": "driver-001",
     "name": "Ramesh Yadav",
-    "phone_number": 9876543210,
-    "truck_id": "MH13AB4721",
-    "status": "available",
-    "source_location": "Solapur MIDC, Solapur",
-    "documents": []
+    "phone": "9876543210",
+    "clientId": "client-001",
+    "sourceId": "source-001",
+    "vehicleId": "MH13AB4721",
+    "status": "available"
   },
   {
-    "id": "drv-002",
+    "id": "driver-002",
     "name": "Suresh Kumar",
-    "phone_number": 9823456701,
-    "truck_id": "MH13XY8892",
-    "status": "available",
-    "source_location": "Mohol MIDC, Solapur",
-    "documents": []
+    "phone": "9823456701",
+    "clientId": "client-002",
+    "sourceId": "source-003",
+    "vehicleId": "MH13XY8892",
+    "status": "unavailable"
   },
   {
-    "id": "drv-003",
+    "id": "driver-003",
     "name": "Mahesh Patil",
-    "phone_number": 9765432189,
-    "truck_id": "MH09FY9095",
-    "status": "available",
-    "source_location": "Hotgi Road, Solapur",
-    "documents": []
+    "phone": "9765432189",
+    "clientId": "client-003",
+    "sourceId": "source-005",
+    "vehicleId": "MH09FY9095",
+    "status": "unavailable"
   },
   {
-    "id": "drv-004",
+    "id": "driver-004",
     "name": "Dinesh Verma",
-    "phone_number": 9812345678,
-    "truck_id": "MH12GH3341",
-    "status": "available",
-    "source_location": "Tembhurni Bypass, Solapur",
-    "documents": []
+    "phone": "9812345678",
+    "clientId": "client-004",
+    "sourceId": "source-007",
+    "vehicleId": "MH12GH3341",
+    "status": "available"
   },
   {
-    "id": "drv-005",
+    "id": "driver-005",
     "name": "Prakash Shinde",
-    "phone_number": 9745612380,
-    "truck_id": "MH04KL7723",
-    "status": "available",
-    "source_location": "Akkalkot Road, Solapur",
-    "documents": []
+    "phone": "9745612380",
+    "clientId": "client-001",
+    "sourceId": "source-002",
+    "vehicleId": "MH04KL7723",
+    "status": "available"
   },
   {
-    "id": "drv-006",
+    "id": "driver-006",
     "name": "Vijay Tiwari",
-    "phone_number": 9934561270,
-    "truck_id": "MH06MN2256",
-    "status": "available",
-    "source_location": "Kurduwadi Junction, Solapur",
-    "documents": []
+    "phone": "9934561270",
+    "clientId": "client-002",
+    "sourceId": "source-004",
+    "vehicleId": "MH06MN2256",
+    "status": "available"
   },
   {
-    "id": "drv-007",
+    "id": "driver-007",
     "name": "Anil Deshmukh",
-    "phone_number": 9856341207,
-    "truck_id": "MH12PQ5588",
-    "status": "available",
-    "source_location": "Bibis, Pune",
-    "documents": []
+    "phone": "9856341207",
+    "clientId": "client-003",
+    "sourceId": "source-006",
+    "vehicleId": "MH21PQ5588",
+    "status": "available"
   },
   {
-    "id": "drv-008",
+    "id": "driver-008",
     "name": "Santosh More",
-    "phone_number": 9778923456,
-    "truck_id": "MH14RS1190",
-    "status": "available",
-    "source_location": "MG Road, Pune",
-    "documents": []
+    "phone": "9778923456",
+    "clientId": "client-004",
+    "sourceId": "source-008",
+    "vehicleId": "MH14RS1190",
+    "status": "available"
   }
 ]

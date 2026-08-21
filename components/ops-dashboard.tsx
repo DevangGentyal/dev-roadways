@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   House,
   Truck,
@@ -65,9 +65,12 @@ type TripStatus =
 type Trip = {
   id: string;
   reference: string;
+  clientId?: string;
   customer: string;
   origin: string;
   destination: string;
+  sourceId?: string;
+  driverId?: string;
   date: string;
   time: string;
   requestedDeliveryDate?: string;
@@ -157,12 +160,15 @@ type FuelTransaction = {
 type Driver = {
   id: string;
   name: string;
-  phone_number: number;
-  truck_id: string;
+  phone: string;
+  vehicleId: string;
   status: "available" | "unavailable";
-  source_location: string;
+  clientId: string;
+  sourceId: string;
   documents: unknown[];
 };
+type Source = { id: string; name: string; address: string };
+type Client = { id: string; name: string; code: string; sources: Source[] };
 type Vehicle = {
   truck_id: string;
   brand: string;
@@ -177,7 +183,7 @@ type Vehicle = {
 const ROLE_GREETINGS: Record<Role, string> = {
   Coordinator: "Govind",
   Operations: "Laxman",
-  Driver: "Ramesh Yadav",
+  Driver: "Ramesh",
   "Super Admin": "Dheeraj",
 };
 
@@ -298,6 +304,7 @@ export default function OpsDashboard() {
   const [fuelTransactions, setFuelTransactions] = useState<FuelTransaction[]>(
     [],
   );
+  const [clients, setClients] = useState<Client[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [dbReady, setDbReady] = useState(false);
@@ -311,6 +318,7 @@ export default function OpsDashboard() {
       })
       .then((data) => {
         setTrips(data.trips || []);
+        setClients(data.clients || []);
         setFollowups(data.followups || []);
         setFuelTransactions(data.fuelTransactions || []);
         setDrivers(data.drivers || []);
@@ -355,7 +363,8 @@ export default function OpsDashboard() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [toast, setToast] = useState("");
 
-  const [activeDriverFlow, setActiveDriverFlow] = useState<DriverFlowState | null>(null);
+  const [activeDriverFlow, setActiveDriverFlow] =
+    useState<DriverFlowState | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -390,7 +399,7 @@ export default function OpsDashboard() {
             "IN_TRANSIT",
             "ON_HOLD",
             "REACHED",
-          ].includes(t.status)
+          ].includes(t.status),
       );
 
       const expectedStatus: "available" | "unavailable" = hasOngoingTrip
@@ -421,9 +430,7 @@ export default function OpsDashboard() {
   };
 
   const isDriverFlowLocked =
-    role === "Driver" &&
-    activeDriverFlow !== null &&
-    activeDriverFlow.step < 9;
+    role === "Driver" && activeDriverFlow !== null && activeDriverFlow.step < 9;
 
   const notify = (msg: string) => {
     setToast(msg);
@@ -684,7 +691,10 @@ export default function OpsDashboard() {
     }
   }
 
-  async function submitStampedDocsForTrip(tripId: string, docs: TripDocument[]) {
+  async function submitStampedDocsForTrip(
+    tripId: string,
+    docs: TripDocument[],
+  ) {
     const targetTrip = trips.find((t) => t.id === tripId);
     const entities = docs.map((d) => ({
       ...d,
@@ -728,13 +738,17 @@ export default function OpsDashboard() {
         ...d,
         tripId: t.id,
         trip_Id: d.trip_Id || t.reference,
-      }))
+      })),
     );
     await persist("documents", allDocs);
 
-    const targetDoc = nextTrips.find((t) => t.id === tripId)?.documents.find((d) => d.id === docId);
+    const targetDoc = nextTrips
+      .find((t) => t.id === tripId)
+      ?.documents.find((d) => d.id === docId);
     const isVer = targetDoc?.status === "verified";
-    notify(`Document "${targetDoc?.name || ""}" marked as ${isVer ? "Verified" : "Unverified"}`);
+    notify(
+      `Document "${targetDoc?.name || ""}" marked as ${isVer ? "Verified" : "Unverified"}`,
+    );
   }
 
   // ─── Derived ──────────────────────────────────────────────────────────────
@@ -928,16 +942,22 @@ export default function OpsDashboard() {
 
               {isDriverFlowLocked && activeDriverFlow ? (
                 (() => {
-                  const activeTrip = trips.find((t) => t.id === activeDriverFlow.tripId);
+                  const activeTrip = trips.find(
+                    (t) => t.id === activeDriverFlow.tripId,
+                  );
                   return activeTrip ? (
                     <DriverWorkflow
                       trip={activeTrip}
                       flowState={activeDriverFlow}
                       onUpdateFlowState={updateDriverFlowState}
-                      onAddDocument={(doc) => addDocumentForTrip(activeTrip.id, doc)}
+                      onAddDocument={(doc) =>
+                        addDocumentForTrip(activeTrip.id, doc)
+                      }
                       onStartTrip={startTrip}
                       onReachTrip={reachTrip}
-                      onSubmitStampedDocs={(docs) => submitStampedDocsForTrip(activeTrip.id, docs)}
+                      onSubmitStampedDocs={(docs) =>
+                        submitStampedDocsForTrip(activeTrip.id, docs)
+                      }
                       onCompleteFlow={() => updateDriverFlowState(null)}
                     />
                   ) : (
@@ -964,8 +984,7 @@ export default function OpsDashboard() {
                           if (docs.includes("WB (stamped)")) step = 8;
                           else if (docs.includes("LR (stamped)")) step = 7;
                           else step = 6;
-                        }
-                        else if (t.status === "IN_TRANSIT") step = 5;
+                        } else if (t.status === "IN_TRANSIT") step = 5;
                         else if (docs.includes("Invoice")) step = 4;
                         else if (docs.includes("WB")) step = 3;
                         else if (docs.includes("LR")) step = 2;
@@ -1005,9 +1024,9 @@ export default function OpsDashboard() {
                   onFollowup={
                     role === "Operations"
                       ? () => {
-                        setFollowupTripFilter(selected.reference);
-                        setView("followups");
-                      }
+                          setFollowupTripFilter(selected.reference);
+                          setView("followups");
+                        }
                       : undefined
                   }
                   onApprove={(t) => setApprovePendingTrip(t)}
@@ -1212,7 +1231,11 @@ export default function OpsDashboard() {
         </div>
       )}
       {showCreate && (
-        <CreateModal onClose={() => setShowCreate(false)} onCreate={addTrip} />
+        <CreateModal
+          onClose={() => setShowCreate(false)}
+          onCreate={addTrip}
+          clients={clients}
+        />
       )}
       {showImport && (
         <ImportModal
@@ -1264,6 +1287,7 @@ export default function OpsDashboard() {
         <AssignDriverModal
           trip={approvePendingTrip}
           drivers={drivers}
+          clients={clients}
           vehicles={vehicles}
           onClose={() => setApprovePendingTrip(null)}
           onConfirm={(driver) => {
@@ -1298,14 +1322,20 @@ function NavItem({
       className={`nav-item ${active ? "active" : ""}`}
       onClick={disabled ? undefined : onClick}
       style={disabled ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
-      title={disabled ? "Navigation is locked during active driver workflow" : undefined}
+      title={
+        disabled
+          ? "Navigation is locked during active driver workflow"
+          : undefined
+      }
     >
       <span style={{ display: "inline-flex", alignItems: "center" }}>
         {icon}
       </span>
       {label}
       {count ? <em>{count}</em> : null}
-      {disabled && <Lock size={12} style={{ marginLeft: "auto", opacity: 0.7 }} />}
+      {disabled && (
+        <Lock size={12} style={{ marginLeft: "auto", opacity: 0.7 }} />
+      )}
     </button>
   );
 }
@@ -1364,6 +1394,16 @@ function Dashboard({
 
   return (
     <div>
+      {role === "Driver" && onAcceptTrip && onRejectTrip && onResumeFlow && (
+        <DriverOverviewSection
+          trips={trips}
+          activeDriverFlow={activeDriverFlow}
+          onAcceptTrip={onAcceptTrip}
+          onRejectTrip={onRejectTrip}
+          onResumeFlow={onResumeFlow}
+        />
+      )}
+
       <section
         className="stats"
         style={{
@@ -1380,6 +1420,7 @@ function Dashboard({
             hint="Awaiting Ops review"
             icon={<Clock size={18} />}
             onClick={() => onMetricClick("New")}
+            alert={role === "Operations" && newTrips.length > 0}
           />
         )}
         <Stat
@@ -1425,16 +1466,6 @@ function Dashboard({
           />
         )}
       </section>
-
-      {role === "Driver" && onAcceptTrip && onRejectTrip && onResumeFlow && (
-        <DriverOverviewSection
-          trips={trips}
-          activeDriverFlow={activeDriverFlow}
-          onAcceptTrip={onAcceptTrip}
-          onRejectTrip={onRejectTrip}
-          onResumeFlow={onResumeFlow}
-        />
-      )}
     </div>
   );
 }
@@ -1446,6 +1477,7 @@ function Stat({
   tone,
   icon,
   onClick,
+  alert,
 }: {
   label: string;
   value: string | number;
@@ -1453,6 +1485,7 @@ function Stat({
   tone: string;
   icon?: React.ReactNode;
   onClick?: () => void;
+  alert?: boolean;
 }) {
   return (
     <button
@@ -1460,16 +1493,33 @@ function Stat({
       style={{
         textAlign: "left",
         border: "1px solid var(--line)",
-        background: "var(--surface)",
+        background: alert
+          ? "linear-gradient(180deg, #fff7ed 0%, #fff 100%)"
+          : "var(--surface)",
         cursor: "pointer",
         width: "100%",
+        boxShadow: alert
+          ? "0 0 0 1px rgba(249, 115, 22, 0.18), 0 8px 24px rgba(249, 115, 22, 0.12)"
+          : undefined,
+        animation: alert ? "pulseAlert 1.8s ease-in-out infinite" : undefined,
       }}
       onClick={onClick}
     >
-      {icon && <span className={`stat-icon ${tone}`}>{icon}</span>}
+      {icon && (
+        <span
+          className={`stat-icon ${tone}`}
+          style={
+            alert ? { background: "#fed7aa", color: "#c2410c" } : undefined
+          }
+        >
+          {icon}
+        </span>
+      )}
       <div>
-        <p>{label}</p>
-        <strong>{value}</strong>
+        <p style={alert ? { color: "#9a3412" } : undefined}>{label}</p>
+        <strong style={alert ? { color: "#c2410c" } : undefined}>
+          {value}
+        </strong>
         <small>{hint}</small>
       </div>
     </button>
@@ -1603,6 +1653,21 @@ function TripList({
   const [draftStatus, setDraftStatus] = useState("All");
   const [draftDateFrom, setDraftDateFrom] = useState("");
   const [draftDateTo, setDraftDateTo] = useState("");
+  const statusPriority: Record<string, number> = {
+    NEW: 0,
+    DRIVER_PENDING: 1,
+    DRIVER_ACCEPTED: 2,
+    PREPARING: 3,
+    READY: 4,
+    IN_TRANSIT: 5,
+    ON_HOLD: 6,
+    REACHED: 7,
+    DELIVERED: 8,
+    DOCUMENTS_SUBMITTED: 9,
+    COMPLETED: 10,
+    REJECTED: 11,
+    DRIVER_REJECTED: 12,
+  };
 
   const FILTER_GROUPS: Record<string, TripStatus[]> = {
     All: [],
@@ -1635,9 +1700,12 @@ function TripList({
     return matchesFilter && matchesQuery && matchesFrom && matchesTo;
   });
   const sorted = [...filtered].sort((a, b) => {
+    const aStatus = statusPriority[a.status] ?? 999;
+    const bStatus = statusPriority[b.status] ?? 999;
+    if (aStatus !== bStatus) return aStatus - bStatus;
     const ad = parseTripDate(a)?.getTime() ?? 0;
     const bd = parseTripDate(b)?.getTime() ?? 0;
-    return sortNewestFirst ? bd - ad : ad - bd;
+    return bd - ad;
   });
   const activeFilters =
     (statusFilter !== "All" ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0);
@@ -1687,12 +1755,16 @@ function TripList({
     setShowFilters(false);
   }
 
+  useEffect(() => {
+    if (filter !== statusFilter) {
+      setStatusFilter(filter);
+      setDraftStatus(filter);
+    }
+  }, [filter]);
+
   return (
     <section className="panel list-panel">
       <div className="panel-header">
-        <div>
-          <h2>{trips.length} trips</h2>
-        </div>
         {role === "Coordinator" && (
           <div className="panel-header-actions">
             <button
@@ -1726,10 +1798,19 @@ function TripList({
             placeholder="Search reference or customer"
           />
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexShrink: 0,
+          }}
+        >
           <button
             className="icon-create"
-            aria-label={sortNewestFirst ? "Sort oldest first" : "Sort newest first"}
+            aria-label={
+              sortNewestFirst ? "Sort oldest first" : "Sort newest first"
+            }
             title={sortNewestFirst ? "Newest first" : "Oldest first"}
             onClick={() => setSortNewestFirst((v) => !v)}
             style={{ width: 40, height: 40, minWidth: 40 }}
@@ -1747,7 +1828,9 @@ function TripList({
               className="button secondary"
               aria-label="Open filters"
               title="Filters"
-              onClick={() => (showFilters ? setShowFilters(false) : openFilters())}
+              onClick={() =>
+                showFilters ? setShowFilters(false) : openFilters()
+              }
               style={{ height: 40, padding: "0 14px", minWidth: 110, gap: 6 }}
             >
               <FunnelSimple size={16} />
@@ -1851,7 +1934,9 @@ function TripList({
                       {statusOptions.map((f) => (
                         <button
                           key={f}
-                          className={draftStatus === f ? "filter active" : "filter"}
+                          className={
+                            draftStatus === f ? "filter active" : "filter"
+                          }
                           style={{
                             width: "100%",
                             justifyContent: "space-between",
@@ -1886,7 +1971,10 @@ function TripList({
                         gap: 10,
                       }}
                     >
-                      <label className="date-range-label" style={{ minWidth: 0 }}>
+                      <label
+                        className="date-range-label"
+                        style={{ minWidth: 0 }}
+                      >
                         <span>From</span>
                         <input
                           type="date"
@@ -1895,7 +1983,10 @@ function TripList({
                           className="date-range-input"
                         />
                       </label>
-                      <label className="date-range-label" style={{ minWidth: 0 }}>
+                      <label
+                        className="date-range-label"
+                        style={{ minWidth: 0 }}
+                      >
                         <span>To</span>
                         <input
                           type="date"
@@ -1972,42 +2063,38 @@ function TripList({
 
 function DocumentPreviewModal({
   doc,
-  tripRef,
-  role,
   onClose,
-  onToggleVerify,
 }: {
   doc: TripDocument;
-  tripRef: string;
-  role: Role;
   onClose: () => void;
-  onToggleVerify?: () => void;
 }) {
-  const isVerified = doc.status === "verified";
-
   return (
     <div className="modal-backdrop" style={{ zIndex: 1100 }}>
-      <div className="modal" style={{ maxWidth: 600, padding: 0, overflow: "hidden" }}>
-        <div
+      <div
+        className="modal"
+        style={{
+          maxWidth: 700,
+          padding: 0,
+          overflow: "hidden",
+          background: "#0f172a",
+        }}
+      >
+        <button
+          onClick={onClose}
+          className="quick-action-icon"
+          aria-label="Close"
           style={{
-            padding: "16px 20px",
-            borderBottom: "1px solid var(--line)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: "var(--surface-alt, #f8fafc)",
+            position: "absolute",
+            top: 14,
+            right: 14,
+            zIndex: 2,
+            background: "rgba(15,23,42,0.72)",
+            color: "#fff",
+            border: "1px solid rgba(255,255,255,0.12)",
           }}
         >
-          <div>
-            <b style={{ fontSize: 15, display: "block" }}>{doc.name}</b>
-            <span style={{ fontSize: 11, color: "var(--muted-ink)" }}>
-              {doc.type} · Trip {tripRef} · {doc.uploadedAt}
-            </span>
-          </div>
-          <button onClick={onClose} className="quick-action-icon" aria-label="Close">
-            <X size={18} />
-          </button>
-        </div>
+          <X size={18} />
+        </button>
 
         <div
           style={{
@@ -2018,105 +2105,24 @@ function DocumentPreviewModal({
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            minHeight: 300,
+            minHeight: 420,
             textAlign: "center",
           }}
         >
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 480,
-              padding: 32,
-              background: "#1e293b",
-              borderRadius: 12,
-              border: "1px solid #334155",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-            }}
-          >
-            <FileText size={64} style={{ color: "#38bdf8", marginBottom: 12 }} />
-            <b style={{ fontSize: 15, color: "#f8fafc", marginBottom: 4 }}>{doc.name}</b>
-            <span style={{ fontSize: 12, color: "#94a3b8", marginBottom: 16 }}>
-              Document Type: <b>{doc.type}</b>
-            </span>
-            <div
+          <FileText size={72} style={{ color: "#38bdf8", marginBottom: 16 }} />
+          <div style={{ width: "100%", maxWidth: 520 }}>
+            <b
               style={{
-                fontSize: 11,
-                color: "#cbd5e1",
-                background: "#0f172a",
-                padding: "8px 16px",
-                borderRadius: 6,
-                border: "1px solid #334155",
+                fontSize: 16,
+                color: "#f8fafc",
+                display: "block",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
               }}
             >
-              📄 Uploaded &amp; Stamped Document Copy for {tripRef}
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            padding: "16px 20px",
-            borderTop: "1px solid var(--line)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: "var(--surface)",
-          }}
-        >
-          <div>
-            {isVerified ? (
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  background: "#dcfce7",
-                  color: "#15803d",
-                  padding: "4px 12px",
-                  borderRadius: 12,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                <Check size={14} /> Verified
-              </span>
-            ) : (
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  background: "#f1f5f9",
-                  color: "#64748b",
-                  padding: "4px 12px",
-                  borderRadius: 12,
-                }}
-              >
-                Pending Verification
-              </span>
-            )}
-          </div>
-
-          <div style={{ display: "flex", gap: 10 }}>
-            {(role === "Operations" || role === "Super Admin") && onToggleVerify && (
-              <button
-                type="button"
-                className={`button ${isVerified ? "secondary" : "primary"}`}
-                onClick={onToggleVerify}
-                style={{ padding: "8px 16px", fontSize: 12 }}
-              >
-                {isVerified ? "Mark Unverified" : "✓ Mark as Verified"}
-              </button>
-            )}
-            <button
-              type="button"
-              className="button secondary"
-              onClick={onClose}
-              style={{ padding: "8px 16px", fontSize: 12 }}
-            >
-              Close
-            </button>
+              {doc.name}
+            </b>
           </div>
         </div>
       </div>
@@ -2200,7 +2206,7 @@ function TripDetail({
         >
           <StatusBadge status={trip.status} />
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {role === "Operations" && onFollowup && (
+            {role === "Operations" && onFollowup && trip.status !== "NEW" && (
               <button
                 className="button secondary compact"
                 onClick={onFollowup}
@@ -2426,56 +2432,134 @@ function TripDetail({
                             borderRadius: 8,
                             border: `1px solid ${isVerified ? "#bbf7d0" : "var(--line)"}`,
                             marginBottom: 8,
-                            background: isVerified ? "#f0fdf4" : "var(--surface)",
+                            background: isVerified
+                              ? "#f0fdf4"
+                              : "var(--surface)",
                           }}
                         >
-                          <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              flex: 1,
+                              minWidth: 0,
+                            }}
+                          >
                             <span className="extra-icon">
-                              <FileText size={18} style={{ color: isVerified ? "#16a34a" : "var(--blue)" }} />
+                              <FileText
+                                size={18}
+                                style={{
+                                  color: isVerified ? "#16a34a" : "var(--blue)",
+                                }}
+                              />
                             </span>
-                            <div style={{ minWidth: 0 }}>
-                              <b style={{ fontSize: 13, display: "block" }}>{doc.name}</b>
-                              <p style={{ fontSize: 11, color: "var(--muted-ink)", margin: 0 }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <b
+                                style={{
+                                  fontSize: 12,
+                                  lineHeight: 1.25,
+                                  display: "block",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {doc.name}
+                              </b>
+                              <p
+                                style={{
+                                  fontSize: 10,
+                                  color: "var(--muted-ink)",
+                                  margin: 0,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
                                 {doc.type} · {doc.uploadedAt}
                               </p>
                             </div>
                           </div>
 
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                              flexShrink: 0,
+                            }}
+                          >
                             <button
                               type="button"
                               className="button secondary compact"
                               onClick={() => setPreviewDoc(doc)}
-                              style={{ padding: "5px 10px", fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}
-                              title="Open & Review Document"
+                              style={{
+                                width: 32,
+                                height: 32,
+                                minWidth: 32,
+                                padding: 0,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                              title="Open document"
+                              aria-label="Open document"
                             >
-                              <Eye size={14} /> Review
+                              <Eye size={16} />
                             </button>
 
-                            {(role === "Operations" || role === "Super Admin") && onToggleVerifyDoc ? (
+                            {(role === "Operations" ||
+                              role === "Super Admin") &&
+                            onToggleVerifyDoc ? (
                               <button
                                 type="button"
                                 className={`button ${isVerified ? "secondary" : "primary"} compact`}
-                                onClick={() => onToggleVerifyDoc(trip.id, doc.id)}
+                                onClick={() =>
+                                  onToggleVerifyDoc(trip.id, doc.id)
+                                }
                                 style={{
-                                  padding: "5px 12px",
-                                  fontSize: 11,
-                                  background: isVerified ? "#dcfce7" : undefined,
+                                  width: 32,
+                                  height: 32,
+                                  minWidth: 32,
+                                  padding: 0,
+                                  background: isVerified
+                                    ? "#dcfce7"
+                                    : undefined,
                                   color: isVerified ? "#15803d" : undefined,
-                                  borderColor: isVerified ? "#86efac" : undefined,
+                                  borderColor: isVerified
+                                    ? "#86efac"
+                                    : undefined,
                                   fontWeight: 600,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
                                 }}
+                                title={isVerified ? "Verified" : "Verify"}
+                                aria-label={isVerified ? "Verified" : "Verify"}
                               >
-                                {isVerified ? "✓ Verified" : "Verify"}
+                                <Check size={16} />
                               </button>
+                            ) : isVerified ? (
+                              <span
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 0,
+                                  color: "#16a34a",
+                                  background: "#dcfce7",
+                                  borderRadius: 8,
+                                }}
+                                title="Verified"
+                                aria-label="Verified"
+                              >
+                                <Check size={16} />
+                              </span>
                             ) : (
-                              isVerified ? (
-                                <span style={{ fontSize: 11, fontWeight: 700, color: "#16a34a", background: "#dcfce7", padding: "4px 10px", borderRadius: 12 }}>
-                                  ✓ Verified
-                                </span>
-                              ) : (
-                                <StatusBadge status={doc.status || "COMPLETED"} />
-                              )
+                              <StatusBadge status={doc.status || "COMPLETED"} />
                             )}
                           </div>
                         </div>
@@ -2723,29 +2807,68 @@ function TripDetail({
           trip.status === "DOCUMENTS_SUBMITTED" && (
             <div className="panel action-panel">
               <h2>Verify Documents</h2>
-              <p style={{ fontSize: 12, color: "var(--muted-ink)", marginBottom: 12 }}>
-                Review each submitted document independently above before completing.
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "var(--muted-ink)",
+                  marginBottom: 12,
+                }}
+              >
+                Review each submitted document independently above before
+                completing.
               </p>
 
               {(() => {
                 const totalDocs = trip.documents.length;
-                const verifiedDocs = trip.documents.filter((d) => d.status === "verified").length;
+                const verifiedDocs = trip.documents.filter(
+                  (d) => d.status === "verified",
+                ).length;
                 const allVerified = totalDocs > 0 && verifiedDocs === totalDocs;
 
                 return (
                   <>
-                    <div style={{ background: "var(--surface-alt, #f8fafc)", border: "1px solid var(--line)", borderRadius: 6, padding: "10px 12px", marginBottom: 16 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 600, marginBottom: 6 }}>
+                    <div
+                      style={{
+                        background: "var(--surface-alt, #f8fafc)",
+                        border: "1px solid var(--line)",
+                        borderRadius: 6,
+                        padding: "10px 12px",
+                        marginBottom: 16,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          marginBottom: 6,
+                        }}
+                      >
                         <span>Verification Progress</span>
-                        <span style={{ color: allVerified ? "#15803d" : "var(--blue)" }}>
+                        <span
+                          style={{
+                            color: allVerified ? "#15803d" : "var(--blue)",
+                          }}
+                        >
                           {verifiedDocs} of {totalDocs} verified
                         </span>
                       </div>
-                      <div style={{ height: 6, background: "var(--line)", borderRadius: 3, overflow: "hidden" }}>
+                      <div
+                        style={{
+                          height: 6,
+                          background: "var(--line)",
+                          borderRadius: 3,
+                          overflow: "hidden",
+                        }}
+                      >
                         <div
                           style={{
                             height: "100%",
-                            width: totalDocs > 0 ? `${(verifiedDocs / totalDocs) * 100}%` : "0%",
+                            width:
+                              totalDocs > 0
+                                ? `${(verifiedDocs / totalDocs) * 100}%`
+                                : "0%",
                             background: allVerified ? "#22c55e" : "#2563eb",
                             transition: "width 0.3s ease",
                           }}
@@ -2758,8 +2881,13 @@ function TripDetail({
                       onClick={() => onCompleteTrip(trip)}
                       style={{ padding: "12px 16px" }}
                     >
-                      <Check size={16} style={{ display: "inline", marginRight: 6 }} />
-                      {allVerified ? "Complete Trip (All Verified)" : "Verify & Complete Trip"}
+                      <Check
+                        size={16}
+                        style={{ display: "inline", marginRight: 6 }}
+                      />
+                      {allVerified
+                        ? "Complete Trip (All Verified)"
+                        : "Verify & Complete Trip"}
                     </button>
                   </>
                 );
@@ -2767,30 +2895,33 @@ function TripDetail({
             </div>
           )}
 
-      {/* Document Review Modal Overlay */}
-      {previewDoc && (
-        <DocumentPreviewModal
-          doc={previewDoc}
-          tripRef={trip.reference}
-          role={role}
-          onClose={() => setPreviewDoc(null)}
-          onToggleVerify={
-            onToggleVerifyDoc
-              ? () => {
-                  onToggleVerifyDoc(trip.id, previewDoc.id);
-                  setPreviewDoc((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          status: prev.status === "verified" ? "uploaded" : "verified",
-                        }
-                      : null
-                  );
-                }
-              : undefined
-          }
-        />
-      )}
+        {/* Document Review Modal Overlay */}
+        {previewDoc && (
+          <DocumentPreviewModal
+            doc={previewDoc}
+            tripRef={trip.reference}
+            role={role}
+            onClose={() => setPreviewDoc(null)}
+            onToggleVerify={
+              onToggleVerifyDoc
+                ? () => {
+                    onToggleVerifyDoc(trip.id, previewDoc.id);
+                    setPreviewDoc((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            status:
+                              prev.status === "verified"
+                                ? "uploaded"
+                                : "verified",
+                          }
+                        : null,
+                    );
+                  }
+                : undefined
+            }
+          />
+        )}
       </div>
     </section>
   );
@@ -3187,32 +3318,35 @@ function extractCity(location: string): string {
   const parts = location.split(",");
   return parts[parts.length - 1].trim().toLowerCase();
 }
-function scoreDriverForOrigin(driver: Driver, origin: string): number {
-  if (!origin.trim()) return 0;
-  const originTokens = origin
-    .toLowerCase()
-    .split(/[\s,]+/)
-    .filter((w) => w.length > 2);
-  const locTokens = driver.source_location
-    .toLowerCase()
-    .split(/[\s,]+/)
-    .filter((w) => w.length > 2);
-  return originTokens.reduce(
-    (score, ow) =>
-      score +
-      (locTokens.some((lw) => lw.includes(ow) || ow.includes(lw)) ? 1 : 0),
-    0,
-  );
+function normalizeLocation(value?: string | null): string {
+  return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }
-function scoreDriverForCity(driver: Driver, origin: string): number {
+function scoreDriverForOrigin(driver: Driver, origin: string): number {
+  if (!normalizeLocation(origin)) return 0;
+  const normalizedOrigin = normalizeLocation(origin);
+  const normalizedDriverLocation = normalizeLocation(
+    (driver as unknown as { source_location?: string }).source_location,
+  );
+  if (normalizedOrigin === normalizedDriverLocation) return 5;
+  if (normalizedOrigin.includes(normalizedDriverLocation)) return 4;
+  if (normalizedDriverLocation.includes(normalizedOrigin)) return 4;
+
   const originCity = extractCity(origin);
-  const driverCity = extractCity(driver.source_location);
+  const driverCity = extractCity(
+    (driver as unknown as { source_location?: string }).source_location ?? "",
+  );
+  if (originCity && originCity === driverCity) return 3;
   if (
     originCity &&
     (driverCity.includes(originCity) || originCity.includes(driverCity))
   )
-    return 3;
-  return scoreDriverForOrigin(driver, origin);
+    return 2;
+  return 0;
+}
+
+function scoreDriverForSourceId(driver: Driver, sourceId?: string): number {
+  if (!sourceId) return 0;
+  return driver.sourceId === sourceId ? 100 : 0;
 }
 
 // ─── AssignDriverModal (auto-assign, kept from git) ───────────────────────────
@@ -3220,31 +3354,59 @@ function scoreDriverForCity(driver: Driver, origin: string): number {
 function AssignDriverModal({
   trip,
   drivers,
+  clients,
   vehicles,
   onClose,
   onConfirm,
 }: {
   trip: Trip;
   drivers: Driver[];
+  clients: Client[];
   vehicles: Vehicle[];
   onClose: () => void;
   onConfirm: (driver?: Driver) => void;
 }) {
+  const selectedClient = clients.find((c) => c.id === trip.clientId) ?? null;
+  const selectedSource =
+    selectedClient?.sources.find((s) => s.id === trip.sourceId) ?? null;
+
   const scored = drivers
     .map((d) => ({
       driver: d,
-      score: scoreDriverForCity(d, trip.origin),
-      vehicle: vehicles.find((v) => v.truck_id === d.truck_id) ?? null,
+      score:
+        scoreDriverForSourceId(d, trip.sourceId) +
+        scoreDriverForOrigin(d, trip.origin) +
+        (trip.cargoCompany &&
+        d.source_company &&
+        normalizeLocation(trip.cargoCompany) ===
+          normalizeLocation(d.source_company)
+          ? 2
+          : 0),
+      vehicle: vehicles.find((v) => v.truck_id === d.vehicleId) ?? null,
     }))
     .sort((a, b) => {
-      const aA = a.driver.status === "available" ? 1 : 0;
-      const bA = b.driver.status === "available" ? 1 : 0;
-      if (aA !== bA) return bA - aA;
+      const aExact = a.score >= 100 ? 1 : 0;
+      const bExact = b.score >= 100 ? 1 : 0;
+      if (aExact !== bExact) return bExact - aExact;
       return b.score - a.score;
     });
-  const suggested = scored.find((s) => s.driver.status === "available") ?? null;
+  const suggested =
+    scored.find((s) => s.score >= 100) ??
+    scored.find((s) => s.score > 0) ??
+    null;
   const [selectedId, setSelectedId] = useState(suggested?.driver.id ?? "");
   const selectedEntry = scored.find((s) => s.driver.id === selectedId) ?? null;
+  const selectedDriverClient =
+    clients.find((c) => c.id === selectedEntry?.driver.clientId) ?? null;
+  const selectedDriverSource =
+    selectedDriverClient?.sources.find(
+      (s) => s.id === selectedEntry?.driver.sourceId,
+    ) ?? null;
+  const selectedVehicle =
+    vehicles.find((v) => v.truck_id === selectedEntry?.driver.vehicleId) ??
+    null;
+  const canAssign =
+    !!selectedEntry && selectedEntry.driver.status === "available";
 
   return (
     <div className="modal-backdrop">
@@ -3260,7 +3422,7 @@ function AssignDriverModal({
         <div
           style={{
             padding: "0 20px",
-            maxHeight: 260,
+            maxHeight: 280,
             overflowY: "auto",
             display: "flex",
             flexDirection: "column",
@@ -3321,6 +3483,20 @@ function AssignDriverModal({
                         Suggested
                       </span>
                     )}
+                    {isSelected && (
+                      <span
+                        style={{
+                          marginLeft: "auto",
+                          fontSize: 9,
+                          fontWeight: 700,
+                          color: "var(--blue)",
+                          textTransform: "uppercase",
+                          letterSpacing: ".05em",
+                        }}
+                      >
+                        Selected
+                      </span>
+                    )}
                     {!isAvailable && (
                       <span
                         style={{
@@ -3345,32 +3521,25 @@ function AssignDriverModal({
                       margin: 0,
                     }}
                   >
-                    {driver.source_location}
+                    {clients.find((c) => c.id === driver.clientId)?.name ??
+                      "Unknown client"}{" "}
+                    ·{" "}
+                    {clients
+                      .find((c) => c.id === driver.clientId)
+                      ?.sources.find((s) => s.id === driver.sourceId)?.name ??
+                      "Unknown source"}
                   </p>
-                  {driver.truck_id && (
-                    <p
-                      style={{
-                        fontSize: 10,
-                        color: "var(--muted-ink)",
-                        margin: "1px 0 0",
-                      }}
-                    >
-                      {driver.truck_id}
-                    </p>
-                  )}
-                </div>
-                {score >= 3 && isAvailable && (
-                  <span
+                  <p
                     style={{
                       fontSize: 10,
-                      fontWeight: 600,
-                      color: "var(--blue)",
-                      flexShrink: 0,
+                      color: "var(--muted-ink)",
+                      margin: "1px 0 0",
                     }}
                   >
-                    City match
-                  </span>
-                )}
+                    {driver.vehicleId}
+                  </p>
+                </div>
+
                 {isSelected && (
                   <Check
                     size={14}
@@ -3393,14 +3562,14 @@ function AssignDriverModal({
             </p>
           )}
         </div>
-        {selectedEntry?.vehicle && (
+        {selectedVehicle && (
           <div
             style={{
               margin: "0 20px 16px",
               background: "var(--surface-alt, #f8fafc)",
               border: "1px solid var(--line)",
-              borderRadius: 8,
-              padding: "10px 12px",
+              borderRadius: 12,
+              padding: "12px 14px",
             }}
           >
             <p
@@ -3415,29 +3584,25 @@ function AssignDriverModal({
             >
               Assigned truck
             </p>
-            <b style={{ fontSize: 12, display: "block", marginBottom: 6 }}>
-              {selectedEntry.vehicle.brand} {selectedEntry.vehicle.model_name}
+            <b style={{ fontSize: 12, display: "block", marginBottom: 8 }}>
+              {selectedVehicle.brand} {selectedVehicle.model_name}
             </b>
             <div className="info-grid compact-grid">
-              <Info label="Truck ID" value={selectedEntry.vehicle.truck_id} />
-              <Info label="Type" value={selectedEntry.vehicle.type} />
-              <Info
-                label="Tyres"
-                value={`${selectedEntry.vehicle.tires_count} tyres`}
-              />
-              <Info
-                label="Capacity"
-                value={selectedEntry.vehicle.load_capacity}
-              />
-              <Info
-                label="Mileage"
-                value={`${selectedEntry.vehicle.mileage_kmpl} km/L`}
-              />
-              <Info
-                label="BS6"
-                value={selectedEntry.vehicle.BS6 === "yes" ? "Yes" : "No"}
-              />
+              <Info label="Truck ID" value={selectedVehicle.truck_id} />
+              <Info label="Type" value={selectedVehicle.type} />
+              <Info label="Capacity" value={selectedVehicle.load_capacity} />
             </div>
+            {selectedDriverClient && selectedDriverSource && (
+              <p
+                style={{
+                  fontSize: 10,
+                  color: "var(--muted-ink)",
+                  margin: "10px 0 0",
+                }}
+              >
+                {selectedDriverClient.name} · {selectedDriverSource.name}
+              </p>
+            )}
           </div>
         )}
         <div
@@ -3450,11 +3615,13 @@ function AssignDriverModal({
         >
           <button
             className="button primary wide"
-            disabled={!selectedId}
+            disabled={!canAssign}
             onClick={() => onConfirm(selectedEntry?.driver ?? undefined)}
           >
-            {selectedId
-              ? `Assign ${selectedEntry?.driver.name ?? ""} & Approve`
+            {selectedEntry
+              ? canAssign
+                ? `Assign ${selectedEntry?.driver.name ?? ""} & Approve`
+                : "Selected driver is unavailable"
               : "Select a driver to continue"}
           </button>
           <button
@@ -3494,13 +3661,15 @@ const DUMMY_PICKUP_LOCATIONS = [
 function CreateModal({
   onClose,
   onCreate,
+  clients,
 }: {
   onClose: () => void;
   onCreate: (t: Trip) => void;
+  clients: Client[];
 }) {
   const [reference, setReference] = useState("");
-  const [customer, setCustomer] = useState(DUMMY_CUSTOMERS[0]);
-  const [origin, setOrigin] = useState(DUMMY_PICKUP_LOCATIONS[0]);
+  const [clientId, setClientId] = useState("");
+  const [sourceId, setSourceId] = useState("");
   const [destination, setDestination] = useState("");
   const [pickupDT, setPickupDT] = useState("");
   const [deliveryDT, setDeliveryDT] = useState("");
@@ -3508,6 +3677,22 @@ function CreateModal({
   const [cargoWeight, setCargoWeight] = useState("");
   const [cargoType, setCargoType] = useState<Trip["cargoType"]>("Bagged");
   const [noOfBags, setNoOfBags] = useState("");
+
+  const selectedClient = clients.find((c) => c.id === clientId) ?? null;
+  const sourceOptions = selectedClient?.sources ?? [];
+  const selectedSource = sourceOptions.find((s) => s.id === sourceId) ?? null;
+
+  useEffect(() => {
+    if (
+      selectedClient &&
+      !selectedClient.sources.some((s) => s.id === sourceId)
+    ) {
+      setSourceId("");
+    }
+    if (!clientId && sourceId) {
+      setSourceId("");
+    }
+  }, [clientId, selectedClient, sourceId]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -3524,15 +3709,17 @@ function CreateModal({
     onCreate({
       id: `req-${Date.now()}`,
       reference: reference || `DR-${1050 + Math.floor(Math.random() * 20)}`,
-      customer: customer || DUMMY_CUSTOMERS[0],
-      origin: origin || DUMMY_PICKUP_LOCATIONS[0],
+      clientId: clientId || undefined,
+      sourceId: sourceId || undefined,
+      customer: selectedClient?.name || "Unassigned",
+      origin: selectedSource?.address || "Pending source selection",
       destination: destination || "Nashik MIDC",
       date: date || "20 Aug 2026",
       time: time || "09:00",
       requestedDeliveryDate: dDate || date || "20 Aug 2026",
       requestedDeliveryTime: dTime || time || "09:00",
       cargoMaterial,
-      cargoCompany: customer || DUMMY_CUSTOMERS[0],
+      cargoCompany: selectedClient?.name || "Unassigned",
       cargoWeight,
       cargoType,
       noOfBags: noOfBags || "1 bag",
@@ -3556,41 +3743,49 @@ function CreateModal({
           />
         </label>
         <label>
-          Customer
+          Client
           <select
-            value={customer}
-            onChange={(e) => setCustomer(e.target.value)}
+            value={clientId}
+            onChange={(e) => {
+              setClientId(e.target.value);
+              setSourceId("");
+            }}
           >
-            {DUMMY_CUSTOMERS.map((c) => (
-              <option key={c} value={c}>
-                {c}
+            <option value="">Select client</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </select>
         </label>
-        <div className="form-row">
-          <label>
-            Pickup
-            <select
-              value={origin}
-              onChange={(e) => setOrigin(e.target.value)}
-            >
-              {DUMMY_PICKUP_LOCATIONS.map((loc) => (
-                <option key={loc} value={loc}>
-                  {loc}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Drop-off
-            <input
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              placeholder="City or address"
-            />
-          </label>
-        </div>
+        <label>
+          Source
+          <select
+            value={sourceId}
+            onChange={(e) => {
+              setSourceId(e.target.value);
+            }}
+            disabled={!selectedClient}
+          >
+            <option value="">
+              {selectedClient ? "Select source" : "Select client first"}
+            </option>
+            {sourceOptions.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Destination
+          <input
+            value={destination}
+            onChange={(e) => setDestination(e.target.value)}
+            placeholder="City or address"
+          />
+        </label>
         <label>
           Pickup date &amp; time
           <input
@@ -3629,14 +3824,16 @@ function CreateModal({
             </select>
           </label>
         </div>
-        <label>
-          No. of bags
-          <input
-            value={noOfBags}
-            onChange={(e) => setNoOfBags(e.target.value)}
-            placeholder="560 bags"
-          />
-        </label>
+        {cargoType === "Bagged" && (
+          <label>
+            No. of bags
+            <input
+              value={noOfBags}
+              onChange={(e) => setNoOfBags(e.target.value)}
+              placeholder="560 bags"
+            />
+          </label>
+        )}
         <button className="button primary wide" type="submit">
           Create trip
         </button>
@@ -4868,9 +5065,8 @@ function DriverOverviewSection({
   onRejectTrip: (t: Trip) => void;
   onResumeFlow: (t: Trip) => void;
 }) {
-  const driverPendingTrips = trips.filter(
-    (t) => t.status === "DRIVER_PENDING"
-  );
+  const driverPendingTrips = trips.filter((t) => t.status === "DRIVER_PENDING");
+  if (driverPendingTrips.length === 0) return null;
 
   return (
     <div style={{ marginTop: 24 }}>
@@ -4898,7 +5094,9 @@ function DriverOverviewSection({
           <button
             className="button primary"
             onClick={() => {
-              const activeTrip = trips.find((t) => t.id === activeDriverFlow.tripId);
+              const activeTrip = trips.find(
+                (t) => t.id === activeDriverFlow.tripId,
+              );
               if (activeTrip) onResumeFlow(activeTrip);
             }}
           >
@@ -4909,67 +5107,70 @@ function DriverOverviewSection({
 
       <div className="panel" style={{ padding: 20 }}>
         <h2 style={{ fontSize: 16, marginBottom: 16 }}>Pending Requests</h2>
-        {driverPendingTrips.length === 0 ? (
-          <p style={{ fontSize: 13, color: "var(--muted-ink)", textAlign: "center", padding: "32px 16px", margin: 0 }}>
-            No pending requests
-          </p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {driverPendingTrips.map((t) => (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {driverPendingTrips.map((t) => (
+            <div
+              key={t.id}
+              style={{
+                border: "1px solid var(--line)",
+                borderRadius: 8,
+                padding: 16,
+                background: "var(--panel)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
               <div
-                key={t.id}
                 style={{
-                  border: "1px solid var(--line)",
-                  borderRadius: 8,
-                  padding: 16,
-                  background: "var(--panel)",
                   display: "flex",
-                  flexDirection: "column",
-                  gap: 12,
+                  alignItems: "center",
+                  justifyContent: "space-between",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div>
-                    <b style={{ fontSize: 14, marginRight: 8 }}>{t.reference}</b>
-                    <span style={{ fontSize: 12, color: "var(--muted-ink)" }}>{t.customer}</span>
-                  </div>
-                  <StatusBadge status={t.status} />
+                <div>
+                  <b style={{ fontSize: 14, marginRight: 8 }}>{t.reference}</b>
+                  <span style={{ fontSize: 12, color: "var(--muted-ink)" }}>
+                    {t.customer}
+                  </span>
                 </div>
+                <StatusBadge status={t.status} />
+              </div>
 
-                <div style={{ fontSize: 12, color: "var(--ink)" }}>
-                  <div>
-                    <b>Pickup:</b> {t.origin} ({t.date} · {t.time})
-                  </div>
-                  <div>
-                    <b>Drop-off:</b> {t.destination}
-                  </div>
-                  <div>
-                    <b>Cargo:</b> {t.cargoMaterial || "Cement"} ({t.cargoWeight || "28 tons"})
-                  </div>
+              <div style={{ fontSize: 12, color: "var(--ink)" }}>
+                <div>
+                  <b>Pickup:</b> {t.origin} ({t.date} · {t.time})
                 </div>
-
-                <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-                  <button
-                    type="button"
-                    className="button primary wide"
-                    onClick={() => onAcceptTrip(t)}
-                    style={{ padding: "8px 14px", fontSize: 12 }}
-                  >
-                    Accept Trip
-                  </button>
-                  <button
-                    type="button"
-                    className="button danger wide"
-                    onClick={() => onRejectTrip(t)}
-                    style={{ padding: "8px 14px", fontSize: 12 }}
-                  >
-                    Reject Trip
-                  </button>
+                <div>
+                  <b>Drop-off:</b> {t.destination}
+                </div>
+                <div>
+                  <b>Cargo:</b> {t.cargoMaterial || "Cement"} (
+                  {t.cargoWeight || "28 tons"})
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+
+              <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="button primary wide"
+                  onClick={() => onAcceptTrip(t)}
+                  style={{ padding: "8px 14px", fontSize: 12 }}
+                >
+                  Accept Trip
+                </button>
+                <button
+                  type="button"
+                  className="button danger wide"
+                  onClick={() => onRejectTrip(t)}
+                  style={{ padding: "8px 14px", fontSize: 12 }}
+                >
+                  Reject Trip
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -5004,8 +5205,33 @@ function DriverWorkflow({
   onCompleteFlow: () => void;
 }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [validationError, setValidationError] = useState("");
 
   const currentStep = flowState.step;
+  const stepperRef = useRef<HTMLDivElement | null>(null);
+  const stepRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const initialDocTypes = ["LR", "WB", "Invoice"];
+  const stampedDocTypes = ["LR (stamped)", "WB (stamped)", "Invoice (stamped)"];
+  const hasVerifiedDocs = (types: string[]) =>
+    types.every((type) =>
+      trip.documents.some(
+        (doc) => doc.type === type && doc.status === "verified",
+      ),
+    );
+  const initialDocsVerified = hasVerifiedDocs(initialDocTypes);
+  const stampedDocsVerified = hasVerifiedDocs(stampedDocTypes);
+
+  useEffect(() => {
+    const activeIndex = currentStep - 1;
+    const activeStepEl = stepRefs.current[activeIndex];
+    if (activeStepEl) {
+      activeStepEl.scrollIntoView({
+        behavior: "smooth",
+        inline: "center",
+        block: "nearest",
+      });
+    }
+  }, [currentStep]);
 
   const getTimeString = () => {
     const now = new Date();
@@ -5014,6 +5240,11 @@ function DriverWorkflow({
 
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedFile) {
+      setValidationError("Please choose a document before submitting.");
+      return;
+    }
+    setValidationError("");
     const fileName = selectedFile?.name || `LR_${trip.reference}.jpg`;
     onAddDocument({
       id: `doc-${Date.now()}-1`,
@@ -5033,6 +5264,11 @@ function DriverWorkflow({
 
   const handleStep2Submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedFile) {
+      setValidationError("Please choose a document before submitting.");
+      return;
+    }
+    setValidationError("");
     const fileName = selectedFile?.name || `WB_${trip.reference}.jpg`;
     onAddDocument({
       id: `doc-${Date.now()}-2`,
@@ -5052,6 +5288,11 @@ function DriverWorkflow({
 
   const handleStep3Submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedFile) {
+      setValidationError("Please choose a document before submitting.");
+      return;
+    }
+    setValidationError("");
     const fileName = selectedFile?.name || `Invoice_${trip.reference}.jpg`;
     onAddDocument({
       id: `doc-${Date.now()}-3`,
@@ -5070,6 +5311,10 @@ function DriverWorkflow({
   };
 
   const handleStartTripClick = () => {
+    if (!initialDocsVerified) {
+      setValidationError("Waiting for approval on documents.");
+      return;
+    }
     onStartTrip(trip);
     onUpdateFlowState({
       ...flowState,
@@ -5087,6 +5332,11 @@ function DriverWorkflow({
 
   const handleStep6Submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedFile) {
+      setValidationError("Please choose a document before submitting.");
+      return;
+    }
+    setValidationError("");
     const fileName = selectedFile?.name || `Stamped_LR_${trip.reference}.jpg`;
     onAddDocument({
       id: `doc-${Date.now()}-6`,
@@ -5106,6 +5356,11 @@ function DriverWorkflow({
 
   const handleStep7Submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedFile) {
+      setValidationError("Please choose a document before submitting.");
+      return;
+    }
+    setValidationError("");
     const fileName = selectedFile?.name || `Stamped_WB_${trip.reference}.jpg`;
     onAddDocument({
       id: `doc-${Date.now()}-7`,
@@ -5125,7 +5380,13 @@ function DriverWorkflow({
 
   const handleStep8Submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const fileName = selectedFile?.name || `Stamped_Invoice_${trip.reference}.jpg`;
+    if (!selectedFile) {
+      setValidationError("Please choose a document before submitting.");
+      return;
+    }
+    setValidationError("");
+    const fileName =
+      selectedFile?.name || `Stamped_Invoice_${trip.reference}.jpg`;
     const doc: TripDocument = {
       id: `doc-${Date.now()}-8`,
       name: fileName,
@@ -5181,11 +5442,12 @@ function DriverWorkflow({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 4,
+            gap: 10,
             marginBottom: 24,
             overflowX: "auto",
-            paddingBottom: 4,
+            padding: "2px 2px 8px",
           }}
+          ref={stepperRef}
         >
           {STEPS.map((s) => {
             const isDone = currentStep > s.num;
@@ -5193,14 +5455,19 @@ function DriverWorkflow({
             return (
               <div
                 key={s.num}
+                ref={(el) => {
+                  stepRefs.current[s.num - 1] = el;
+                }}
                 style={{
-                  flex: 1,
-                  minWidth: 100,
+                  flex: "0 0 auto",
+                  minWidth: 112,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  padding: "8px 4px",
-                  borderRadius: 6,
+                  justifyContent: "center",
+                  minHeight: 42,
+                  padding: "10px 12px",
+                  borderRadius: 999,
                   background: isCurrent
                     ? "var(--blue)"
                     : isDone
@@ -5215,6 +5482,9 @@ function DriverWorkflow({
                   fontSize: 11,
                   textAlign: "center",
                   transition: "all 0.2s ease",
+                  boxShadow: isCurrent
+                    ? "0 6px 18px rgba(37,99,235,0.18)"
+                    : "none",
                 }}
               >
                 <span style={{ whiteSpace: "nowrap" }}>
@@ -5242,11 +5512,20 @@ function DriverWorkflow({
                 marginBottom: 16,
               }}
             >
-              <UploadSimple size={32} style={{ color: "var(--blue)", marginBottom: 8 }} />
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <UploadSimple size={20} style={{ color: "var(--blue)" }} />
+              </div>
               <b style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
                 Drag &amp; drop LR document here
               </b>
-              <span style={{ fontSize: 11, color: "var(--muted-ink)", display: "block", marginBottom: 12 }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted-ink)",
+                  display: "block",
+                  marginBottom: 12,
+                }}
+              >
                 Supports PDF, PNG, JPG (Max 10MB)
               </span>
               <input
@@ -5260,19 +5539,52 @@ function DriverWorkflow({
               <button
                 type="button"
                 className="button secondary"
-                onClick={() => document.getElementById("lr-file-input")?.click()}
+                onClick={() =>
+                  document.getElementById("lr-file-input")?.click()
+                }
               >
                 Choose File
               </button>
               {selectedFile && (
-                <div style={{ marginTop: 12, fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 12,
+                    color: "#16a34a",
+                    fontWeight: 600,
+                  }}
+                >
                   Selected: {selectedFile.name}
+                </div>
+              )}
+              {validationError && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    fontSize: 12,
+                    color: "#dc2626",
+                    fontWeight: 600,
+                  }}
+                >
+                  {validationError}
                 </div>
               )}
             </div>
 
-            <button type="submit" className="button primary wide" style={{ padding: "12px 16px" }}>
-              Upload LR
+            <button
+              type="submit"
+              className="button primary wide"
+              style={{
+                padding: "12px 16px",
+                background: selectedFile ? "var(--blue)" : "#dbe4f0",
+                color: selectedFile ? "#fff" : "#64748b",
+                borderColor: selectedFile ? "var(--blue)" : "#dbe4f0",
+                cursor: selectedFile ? "pointer" : "not-allowed",
+                opacity: 1,
+              }}
+              disabled={!selectedFile}
+            >
+              Submit
             </button>
           </form>
         </div>
@@ -5294,11 +5606,20 @@ function DriverWorkflow({
                 marginBottom: 16,
               }}
             >
-              <UploadSimple size={32} style={{ color: "var(--blue)", marginBottom: 8 }} />
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <UploadSimple size={20} style={{ color: "var(--blue)" }} />
+              </div>
               <b style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
                 Drag &amp; drop Weighbridge slip here
               </b>
-              <span style={{ fontSize: 11, color: "var(--muted-ink)", display: "block", marginBottom: 12 }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted-ink)",
+                  display: "block",
+                  marginBottom: 12,
+                }}
+              >
                 Supports PDF, PNG, JPG (Max 10MB)
               </span>
               <input
@@ -5312,19 +5633,52 @@ function DriverWorkflow({
               <button
                 type="button"
                 className="button secondary"
-                onClick={() => document.getElementById("wb-file-input")?.click()}
+                onClick={() =>
+                  document.getElementById("wb-file-input")?.click()
+                }
               >
                 Choose File
               </button>
               {selectedFile && (
-                <div style={{ marginTop: 12, fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 12,
+                    color: "#16a34a",
+                    fontWeight: 600,
+                  }}
+                >
                   Selected: {selectedFile.name}
+                </div>
+              )}
+              {validationError && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    fontSize: 12,
+                    color: "#dc2626",
+                    fontWeight: 600,
+                  }}
+                >
+                  {validationError}
                 </div>
               )}
             </div>
 
-            <button type="submit" className="button primary wide" style={{ padding: "12px 16px" }}>
-              Upload WB
+            <button
+              type="submit"
+              className="button primary wide"
+              style={{
+                padding: "12px 16px",
+                background: selectedFile ? "var(--blue)" : "#dbe4f0",
+                color: selectedFile ? "#fff" : "#64748b",
+                borderColor: selectedFile ? "var(--blue)" : "#dbe4f0",
+                cursor: selectedFile ? "pointer" : "not-allowed",
+                opacity: 1,
+              }}
+              disabled={!selectedFile}
+            >
+              Submit
             </button>
           </form>
         </div>
@@ -5346,11 +5700,20 @@ function DriverWorkflow({
                 marginBottom: 16,
               }}
             >
-              <UploadSimple size={32} style={{ color: "var(--blue)", marginBottom: 8 }} />
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <UploadSimple size={20} style={{ color: "var(--blue)" }} />
+              </div>
               <b style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
                 Drag &amp; drop Invoice document here
               </b>
-              <span style={{ fontSize: 11, color: "var(--muted-ink)", display: "block", marginBottom: 12 }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted-ink)",
+                  display: "block",
+                  marginBottom: 12,
+                }}
+              >
                 Supports PDF, PNG, JPG (Max 10MB)
               </span>
               <input
@@ -5364,19 +5727,52 @@ function DriverWorkflow({
               <button
                 type="button"
                 className="button secondary"
-                onClick={() => document.getElementById("inv-file-input")?.click()}
+                onClick={() =>
+                  document.getElementById("inv-file-input")?.click()
+                }
               >
                 Choose File
               </button>
               {selectedFile && (
-                <div style={{ marginTop: 12, fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 12,
+                    color: "#16a34a",
+                    fontWeight: 600,
+                  }}
+                >
                   Selected: {selectedFile.name}
+                </div>
+              )}
+              {validationError && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    fontSize: 12,
+                    color: "#dc2626",
+                    fontWeight: 600,
+                  }}
+                >
+                  {validationError}
                 </div>
               )}
             </div>
 
-            <button type="submit" className="button primary wide" style={{ padding: "12px 16px" }}>
-              Upload Invoice
+            <button
+              type="submit"
+              className="button primary wide"
+              style={{
+                padding: "12px 16px",
+                background: selectedFile ? "var(--blue)" : "#dbe4f0",
+                color: selectedFile ? "#fff" : "#64748b",
+                borderColor: selectedFile ? "var(--blue)" : "#dbe4f0",
+                cursor: selectedFile ? "pointer" : "not-allowed",
+                opacity: 1,
+              }}
+              disabled={!selectedFile}
+            >
+              Submit
             </button>
           </form>
         </div>
@@ -5387,6 +5783,23 @@ function DriverWorkflow({
         <div className="panel" style={{ padding: 24 }}>
           <h2 style={{ fontSize: 18, marginBottom: 16 }}>Start Trip</h2>
 
+          {!initialDocsVerified ? (
+            <div
+              style={{
+                background: "#fef3c7",
+                border: "1px solid #fcd34d",
+                color: "#92400e",
+                borderRadius: 10,
+                padding: "12px 14px",
+                marginBottom: 16,
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              Waiting for approval on documents.
+            </div>
+          ) : null}
+
           <div
             style={{
               background: "#eff6ff",
@@ -5396,14 +5809,37 @@ function DriverWorkflow({
               marginBottom: 24,
             }}
           >
-            <b style={{ fontSize: 13, color: "#1e40af", display: "block", marginBottom: 6 }}>
+            <b
+              style={{
+                fontSize: 13,
+                color: "#1e40af",
+                display: "block",
+                marginBottom: 6,
+              }}
+            >
               Trip Summary
             </b>
-            <div style={{ fontSize: 12, color: "#1e3a8a", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <div><b>Trip:</b> {trip.reference}</div>
-              <div><b>Customer:</b> {trip.customer}</div>
-              <div><b>Origin:</b> {trip.origin}</div>
-              <div><b>Destination:</b> {trip.destination}</div>
+            <div
+              style={{
+                fontSize: 12,
+                color: "#1e3a8a",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 8,
+              }}
+            >
+              <div>
+                <b>Trip:</b> {trip.reference}
+              </div>
+              <div>
+                <b>Customer:</b> {trip.customer}
+              </div>
+              <div>
+                <b>Origin:</b> {trip.origin}
+              </div>
+              <div>
+                <b>Destination:</b> {trip.destination}
+              </div>
             </div>
           </div>
 
@@ -5411,7 +5847,15 @@ function DriverWorkflow({
             type="button"
             className="button primary wide"
             onClick={handleStartTripClick}
-            style={{ padding: "14px 20px", fontSize: 14, fontWeight: 700, background: "#2563eb" }}
+            disabled={!initialDocsVerified}
+            style={{
+              padding: "14px 20px",
+              fontSize: 14,
+              fontWeight: 700,
+              background: initialDocsVerified ? "#2563eb" : "#dbe4f0",
+              color: initialDocsVerified ? "#fff" : "#64748b",
+              cursor: initialDocsVerified ? "pointer" : "not-allowed",
+            }}
           >
             Start Trip
           </button>
@@ -5423,53 +5867,113 @@ function DriverWorkflow({
         <div className="panel" style={{ padding: 24 }}>
           <h2 style={{ fontSize: 18, marginBottom: 16 }}>In Transit</h2>
 
+          {/* Map Preview */}
           <div
             style={{
-              background: "#1e293b",
-              color: "#fff",
-              borderRadius: 12,
-              padding: 20,
-              marginBottom: 24,
+              width: "100%",
+              maxWidth: 420,
+              height: 520,
+              margin: "0 auto 24px",
+              borderRadius: 16,
+              overflow: "hidden",
+              position: "relative",
+              background: "#e2e8f0",
+              border: "1px solid #cbd5e1",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <img
+              src="/map-preview.png"
+              alt="Trip route map"
+              style={{
+                width: "100%",
+                height: "100%",
+                display: "block",
+                objectFit: "cover",
+                objectPosition: "center",
+              }}
+            />
+
+            {/* Transit overlay */}
+            <div
+              style={{
+                position: "absolute",
+                top: 14,
+                left: 14,
+                right: 14,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: "rgba(15, 23, 42, 0.88)",
+                color: "#fff",
+                backdropFilter: "blur(6px)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
                 <span
                   style={{
-                    width: 10,
-                    height: 10,
+                    width: 9,
+                    height: 9,
                     borderRadius: "50%",
                     background: "#22c55e",
-                    boxShadow: "0 0 10px #22c55e",
+                    boxShadow: "0 0 8px #22c55e",
                     display: "inline-block",
                   }}
                 />
-                <b style={{ fontSize: 12, letterSpacing: ".05em", color: "#4ade80" }}>IN TRANSIT</b>
-              </div>
-              <span style={{ fontSize: 11, opacity: 0.8 }}>Trip: {trip.reference}</span>
-            </div>
 
-            <div style={{ margin: "16px 0" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 8 }}>
-                <span>📍 {trip.origin}</span>
-                <span>🏁 {trip.destination}</span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: ".05em",
+                    color: "#4ade80",
+                  }}
+                >
+                  IN TRANSIT
+                </span>
               </div>
-              <div
+
+              <span
                 style={{
-                  height: 8,
-                  background: "#334155",
-                  borderRadius: 4,
-                  overflow: "hidden",
+                  fontSize: 10,
+                  opacity: 0.8,
                 }}
               >
-                <div
-                  style={{
-                    height: "100%",
-                    width: "68%",
-                    background: "linear-gradient(90deg, #3b82f6, #6366f1)",
-                    borderRadius: 4,
-                  }}
-                />
+                Trip: {trip.reference}
+              </span>
+            </div>
+
+            {/* Route information */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: 14,
+                left: 14,
+                right: 14,
+                padding: "12px 14px",
+                borderRadius: 10,
+                background: "rgba(15, 23, 42, 0.88)",
+                color: "#fff",
+                backdropFilter: "blur(6px)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  fontSize: 11,
+                }}
+              >
+                <span>📍 {trip.origin}</span>
+                <span>🏁 {trip.destination}</span>
               </div>
             </div>
           </div>
@@ -5478,7 +5982,12 @@ function DriverWorkflow({
             type="button"
             className="button primary wide"
             onClick={handleReachDestinationClick}
-            style={{ padding: "14px 20px", fontSize: 14, fontWeight: 700, background: "#16a34a" }}
+            style={{
+              padding: "14px 20px",
+              fontSize: 14,
+              fontWeight: 700,
+              background: "#16a34a",
+            }}
           >
             Reached Destination
           </button>
@@ -5501,11 +6010,20 @@ function DriverWorkflow({
                 marginBottom: 16,
               }}
             >
-              <UploadSimple size={32} style={{ color: "var(--blue)", marginBottom: 8 }} />
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <UploadSimple size={20} style={{ color: "var(--blue)" }} />
+              </div>
               <b style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
                 Drag &amp; drop Stamped LR document here
               </b>
-              <span style={{ fontSize: 11, color: "var(--muted-ink)", display: "block", marginBottom: 12 }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted-ink)",
+                  display: "block",
+                  marginBottom: 12,
+                }}
+              >
                 Supports PDF, PNG, JPG (Max 10MB)
               </span>
               <input
@@ -5519,19 +6037,52 @@ function DriverWorkflow({
               <button
                 type="button"
                 className="button secondary"
-                onClick={() => document.getElementById("stamped-lr-input")?.click()}
+                onClick={() =>
+                  document.getElementById("stamped-lr-input")?.click()
+                }
               >
                 Choose File
               </button>
               {selectedFile && (
-                <div style={{ marginTop: 12, fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 12,
+                    color: "#16a34a",
+                    fontWeight: 600,
+                  }}
+                >
                   Selected: {selectedFile.name}
+                </div>
+              )}
+              {validationError && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    fontSize: 12,
+                    color: "#dc2626",
+                    fontWeight: 600,
+                  }}
+                >
+                  {validationError}
                 </div>
               )}
             </div>
 
-            <button type="submit" className="button primary wide" style={{ padding: "12px 16px" }}>
-              Upload Stamped LR
+            <button
+              type="submit"
+              className="button primary wide"
+              style={{
+                padding: "12px 16px",
+                background: selectedFile ? "var(--blue)" : "#dbe4f0",
+                color: selectedFile ? "#fff" : "#64748b",
+                borderColor: selectedFile ? "var(--blue)" : "#dbe4f0",
+                cursor: selectedFile ? "pointer" : "not-allowed",
+                opacity: 1,
+              }}
+              disabled={!selectedFile}
+            >
+              Submit
             </button>
           </form>
         </div>
@@ -5553,11 +6104,20 @@ function DriverWorkflow({
                 marginBottom: 16,
               }}
             >
-              <UploadSimple size={32} style={{ color: "var(--blue)", marginBottom: 8 }} />
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <UploadSimple size={20} style={{ color: "var(--blue)" }} />
+              </div>
               <b style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
                 Drag &amp; drop Stamped WB slip here
               </b>
-              <span style={{ fontSize: 11, color: "var(--muted-ink)", display: "block", marginBottom: 12 }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted-ink)",
+                  display: "block",
+                  marginBottom: 12,
+                }}
+              >
                 Supports PDF, PNG, JPG (Max 10MB)
               </span>
               <input
@@ -5571,19 +6131,52 @@ function DriverWorkflow({
               <button
                 type="button"
                 className="button secondary"
-                onClick={() => document.getElementById("stamped-wb-input")?.click()}
+                onClick={() =>
+                  document.getElementById("stamped-wb-input")?.click()
+                }
               >
                 Choose File
               </button>
               {selectedFile && (
-                <div style={{ marginTop: 12, fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 12,
+                    color: "#16a34a",
+                    fontWeight: 600,
+                  }}
+                >
                   Selected: {selectedFile.name}
+                </div>
+              )}
+              {validationError && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    fontSize: 12,
+                    color: "#dc2626",
+                    fontWeight: 600,
+                  }}
+                >
+                  {validationError}
                 </div>
               )}
             </div>
 
-            <button type="submit" className="button primary wide" style={{ padding: "12px 16px" }}>
-              Upload Stamped WB
+            <button
+              type="submit"
+              className="button primary wide"
+              style={{
+                padding: "12px 16px",
+                background: selectedFile ? "var(--blue)" : "#dbe4f0",
+                color: selectedFile ? "#fff" : "#64748b",
+                borderColor: selectedFile ? "var(--blue)" : "#dbe4f0",
+                cursor: selectedFile ? "pointer" : "not-allowed",
+                opacity: 1,
+              }}
+              disabled={!selectedFile}
+            >
+              Submit
             </button>
           </form>
         </div>
@@ -5592,7 +6185,9 @@ function DriverWorkflow({
       {/* Step 8: Upload Stamped Invoice */}
       {currentStep === 8 && (
         <div className="panel" style={{ padding: 24 }}>
-          <h2 style={{ fontSize: 18, marginBottom: 16 }}>Upload Stamped Invoice</h2>
+          <h2 style={{ fontSize: 18, marginBottom: 16 }}>
+            Upload Stamped Invoice
+          </h2>
 
           <form onSubmit={handleStep8Submit}>
             <div
@@ -5605,11 +6200,20 @@ function DriverWorkflow({
                 marginBottom: 16,
               }}
             >
-              <UploadSimple size={32} style={{ color: "var(--blue)", marginBottom: 8 }} />
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <UploadSimple size={20} style={{ color: "var(--blue)" }} />
+              </div>
               <b style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
                 Drag &amp; drop Stamped Invoice document here
               </b>
-              <span style={{ fontSize: 11, color: "var(--muted-ink)", display: "block", marginBottom: 12 }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted-ink)",
+                  display: "block",
+                  marginBottom: 12,
+                }}
+              >
                 Supports PDF, PNG, JPG (Max 10MB)
               </span>
               <input
@@ -5623,19 +6227,52 @@ function DriverWorkflow({
               <button
                 type="button"
                 className="button secondary"
-                onClick={() => document.getElementById("stamped-inv-input")?.click()}
+                onClick={() =>
+                  document.getElementById("stamped-inv-input")?.click()
+                }
               >
                 Choose File
               </button>
               {selectedFile && (
-                <div style={{ marginTop: 12, fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 12,
+                    color: "#16a34a",
+                    fontWeight: 600,
+                  }}
+                >
                   Selected: {selectedFile.name}
+                </div>
+              )}
+              {validationError && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    fontSize: 12,
+                    color: "#dc2626",
+                    fontWeight: 600,
+                  }}
+                >
+                  {validationError}
                 </div>
               )}
             </div>
 
-            <button type="submit" className="button primary wide" style={{ padding: "12px 16px" }}>
-              Upload Stamped Invoice
+            <button
+              type="submit"
+              className="button primary wide"
+              style={{
+                padding: "12px 16px",
+                background: selectedFile ? "var(--blue)" : "#dbe4f0",
+                color: selectedFile ? "#fff" : "#64748b",
+                borderColor: selectedFile ? "var(--blue)" : "#dbe4f0",
+                cursor: selectedFile ? "pointer" : "not-allowed",
+                opacity: 1,
+              }}
+              disabled={!selectedFile}
+            >
+              Submit
             </button>
           </form>
         </div>
@@ -5644,31 +6281,93 @@ function DriverWorkflow({
       {/* Step 9: Completion Screen */}
       {currentStep === 9 && (
         <div className="panel" style={{ padding: 32, textAlign: "center" }}>
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: "50%",
-              background: "#dcfce7",
-              color: "#166534",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              margin: "0 auto 16px",
-            }}
-          >
-            <Check size={36} />
-          </div>
-          <h2 style={{ fontSize: 20, marginBottom: 8, color: "#15803d" }}>
-            Trip Completed
-          </h2>
-          <p style={{ fontSize: 13, color: "var(--muted-ink)", maxWidth: 440, margin: "0 auto 24px" }}>
-            All documents for <b>{trip.reference}</b> have been submitted.
-          </p>
+          {!stampedDocsVerified ? (
+            <div
+              style={{
+                background: "#fef3c7",
+                border: "1px solid #fcd34d",
+                color: "#92400e",
+                borderRadius: 10,
+                padding: "12px 14px",
+                marginBottom: 16,
+                fontSize: 13,
+                fontWeight: 600,
+                textAlign: "left",
+              }}
+            >
+              Waiting for approval on documents.
+            </div>
+          ) : null}
+          {stampedDocsVerified ? (
+            <>
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: "50%",
+                  background: "#dcfce7",
+                  color: "#166534",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
+                }}
+              >
+                <Check size={36} />
+              </div>
+              <h2 style={{ fontSize: 20, marginBottom: 8, color: "#15803d" }}>
+                Trip Completed
+              </h2>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "var(--muted-ink)",
+                  maxWidth: 440,
+                  margin: "0 auto 24px",
+                }}
+              >
+                All documents for <b>{trip.reference}</b> have been submitted
+                and verified.
+              </p>
+            </>
+          ) : (
+            <>
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: "50%",
+                  background: "#fef3c7",
+                  color: "#92400e",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
+                }}
+              >
+                <Clock size={32} />
+              </div>
+              <h2 style={{ fontSize: 20, marginBottom: 8, color: "#92400e" }}>
+                Waiting for Approval
+              </h2>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "var(--muted-ink)",
+                  maxWidth: 440,
+                  margin: "0 auto 24px",
+                }}
+              >
+                Uploaded documents for <b>{trip.reference}</b> are pending
+                Operations verification.
+              </p>
+            </>
+          )}
           <button
             type="button"
             className="button primary"
             onClick={onCompleteFlow}
+            disabled={!stampedDocsVerified}
             style={{ padding: "12px 24px", fontSize: 13 }}
           >
             Return to Overview

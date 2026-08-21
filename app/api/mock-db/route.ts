@@ -3,7 +3,7 @@ import path from 'node:path'
 import { NextResponse } from 'next/server'
 
 const dataDir = path.join(process.cwd(), 'data')
-const collections = ['trips', 'selections', 'extras', 'documents', 'followups', 'fuel-transactions', 'drivers', 'vehicles'] as const
+const collections = ['trips', 'clients', 'selections', 'extras', 'documents', 'followups', 'fuel-transactions', 'drivers', 'vehicles'] as const
 
 async function readCollection(collection: string) {
   if (!collections.includes(collection as (typeof collections)[number])) throw new Error('Unknown collection')
@@ -12,7 +12,7 @@ async function readCollection(collection: string) {
 }
 
 export async function GET() {
-  const [trips, selections, extras, documents, followups, fuelTransactions, drivers, vehicles] = await Promise.all(collections.map(readCollection))
+  const [trips, clients, selections, extras, documents, followups, fuelTransactions, drivers, vehicles] = await Promise.all(collections.map(readCollection))
   const documentsMap = new Map((documents as Array<{ id: string }>).map((d) => [d.id, d]))
   const hydratedTrips = (trips as any[]).map((trip) => {
     const docsByTripId = (documents as any[]).filter((doc) => doc.tripId === trip.id)
@@ -26,7 +26,7 @@ export async function GET() {
       documents: tripDocs,
     }
   })
-  return NextResponse.json({ trips: hydratedTrips, selections, extras, documents, followups, fuelTransactions, drivers, vehicles })
+  return NextResponse.json({ trips: hydratedTrips, clients, selections, extras, documents, followups, fuelTransactions, drivers, vehicles })
 }
 
 export async function PUT(request: Request) {

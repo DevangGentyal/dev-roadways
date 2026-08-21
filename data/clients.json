@@ -1,0 +1,70 @@
+[
+  {
+    "id": "client-001",
+    "name": "UltraTech Cement",
+    "code": "ULTRATECH",
+    "sources": [
+      {
+        "id": "source-001",
+        "name": "Solapur",
+        "address": "Solapur, Maharashtra"
+      },
+      {
+        "id": "source-002",
+        "name": "Akkalkot",
+        "address": "Akkalkot, Maharashtra"
+      }
+    ]
+  },
+  {
+    "id": "client-002",
+    "name": "Chettinad Cement",
+    "code": "CHETTINAD",
+    "sources": [
+      {
+        "id": "source-003",
+        "name": "Nashik",
+        "address": "Nashik, Maharashtra"
+      },
+      {
+        "id": "source-004",
+        "name": "Bhubaneswar",
+        "address": "Bhubaneswar, Odisha"
+      }
+    ]
+  },
+  {
+    "id": "client-003",
+    "name": "Dalmia Cement",
+    "code": "DALMIA",
+    "sources": [
+      {
+        "id": "source-005",
+        "name": "Ariyalur",
+        "address": "Ariyalur, Tamil Nadu"
+      },
+      {
+        "id": "source-006",
+        "name": "Beawar",
+        "address": "Beawar, Rajasthan"
+      }
+    ]
+  },
+  {
+    "id": "client-004",
+    "name": "Shree Cement",
+    "code": "SHREE",
+    "sources": [
+      {
+        "id": "source-007",
+        "name": "Coimbatore",
+        "address": "Coimbatore, Tamil Nadu"
+      },
+      {
+        "id": "source-008",
+        "name": "Jaipur",
+        "address": "Jaipur, Rajasthan"
+      }
+    ]
+  }
+]
