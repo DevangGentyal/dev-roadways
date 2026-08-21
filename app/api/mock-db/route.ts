@@ -7,8 +7,12 @@ const collections = ['trips', 'clients', 'selections', 'extras', 'documents', 'f
 
 async function readCollection(collection: string) {
   if (!collections.includes(collection as (typeof collections)[number])) throw new Error('Unknown collection')
-  const content = await fs.readFile(path.join(dataDir, `${collection}.json`), 'utf8')
-  return JSON.parse(content)
+  try {
+    const content = await fs.readFile(path.join(dataDir, `${collection}.json`), 'utf8')
+    return JSON.parse(content)
+  } catch {
+    return []
+  }
 }
 
 export async function GET() {
