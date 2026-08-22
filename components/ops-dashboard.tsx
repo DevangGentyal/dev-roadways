@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { LanguageProvider, useLang, Language } from "@/lib/i18n";
 import {
   House,
   Truck,
@@ -364,6 +365,15 @@ const seedTrips: Trip[] = [
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function OpsDashboard() {
+  return (
+    <LanguageProvider>
+      <OpsDashboardInner />
+    </LanguageProvider>
+  );
+}
+
+function OpsDashboardInner() {
+  const { lang, setLang, t } = useLang();
   const [role, setRole] = useState<Role>("Coordinator");
   const [trips, setTrips] = useState<Trip[]>([]);
   const [followups, setFollowups] = useState<Followup[]>([]);
@@ -1249,7 +1259,7 @@ export default function OpsDashboard() {
 
   const title =
     view === "dashboard"
-      ? `Namaste, ${ROLE_GREETINGS[role]}`
+      ? `नमस्ते, ${ROLE_GREETINGS[role]}`
       : view === "active"
         ? "Active"
         : view === "trips" || view === "trip-detail"
@@ -1273,15 +1283,25 @@ export default function OpsDashboard() {
       <main className="main">
         <header className="topbar">
           <div className="crumb">
-            {role === "Super Admin" ? "Admin" : "Operations"} <span>/</span>{" "}
-            {view === "dashboard" ? "Overview" : title}
+            {role === "Super Admin" ? t("Admin") : t("Operations")} <span>/</span>{" "}
+            {view === "dashboard" ? t("Overview") : t(title)}
           </div>
           <div className="top-actions">
+            <div className="role-switch">
+              <select
+                value={lang}
+                onChange={(e) => setLang(e.target.value as Language)}
+                aria-label="Select language"
+              >
+                <option value="en">English</option>
+                <option value="hi">हिंदी (Hindi)</option>
+              </select>
+            </div>
             <button className="icon-button" aria-label="Notifications">
               <Bell size={18} />
             </button>
             <div className="role-switch">
-              <span>Viewing as</span>
+              <span>{t("Viewing as")}</span>
               <select
                 value={role}
                 onChange={(e) => {
@@ -1290,10 +1310,10 @@ export default function OpsDashboard() {
                 }}
                 aria-label="Select role"
               >
-                <option>Coordinator</option>
-                <option>Operations</option>
-                <option>Driver</option>
-                <option>Super Admin</option>
+                <option value="Coordinator">{t("Coordinator")}</option>
+                <option value="Operations">{t("Operations")}</option>
+                <option value="Driver">{t("Driver")}</option>
+                <option value="Super Admin">{t("Super Admin")}</option>
               </select>
             </div>
           </div>
@@ -1306,7 +1326,7 @@ export default function OpsDashboard() {
           {dbError && <div className="panel db-state error">{dbError}</div>}
           {isOffline && (
             <div className="offline-banner">
-              <b>Offline mode</b>
+              <b>{t("Offline mode")}</b>
               <span>
                 You&apos;re viewing cached app shell content. Live mock data
                 will load again when the connection returns.
@@ -1318,7 +1338,7 @@ export default function OpsDashboard() {
               {!isDriverFlowLocked && (
                 <div className="page-heading">
                   <div>
-                    <h1>{title}</h1>
+                    <h1>{t(title)}</h1>
                   </div>
                   {role === "Coordinator" &&
                     (view === "dashboard" || view === "trips") && (
@@ -1331,7 +1351,7 @@ export default function OpsDashboard() {
                             size={16}
                             style={{ display: "inline", marginRight: 6 }}
                           />
-                          <span>Import Excel</span>
+                          <span>{t("Import Excel")}</span>
                         </button>
                         <button
                           className="button primary"
@@ -1341,7 +1361,7 @@ export default function OpsDashboard() {
                             size={16}
                             style={{ display: "inline", marginRight: 6 }}
                           />
-                          <span>New trip</span>
+                          <span>{t("New trip")}</span>
                         </button>
                       </div>
                     )}
@@ -1740,6 +1760,7 @@ function BottomBar({
       | "followups",
   ) => void;
 }) {
+  const { t } = useLang();
   const items =
     role === "Driver"
       ? [
@@ -1809,8 +1830,8 @@ function BottomBar({
             key={item.id}
             className={`bottom-bar-item ${active ? "active" : ""}`}
             onClick={() => onNavigate(item.id as any)}
-            aria-label={item.label}
-            title={item.label}
+            aria-label={t(item.label)}
+            title={t(item.label)}
             type="button"
           >
             <span className="bottom-bar-icon">{item.icon}</span>
@@ -1823,19 +1844,21 @@ function BottomBar({
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useLang();
   const { bg, color } = getStatusColors(status);
   return (
     <span className="status" style={{ background: bg, color }}>
-      {getStatusLabel(status)}
+      {t(getStatusLabel(status))}
     </span>
   );
 }
 
 // Legacy Status component for compatibility (used by followups, fuel etc.)
 function Status({ children }: { children: string }) {
+  const { t } = useLang();
   return (
     <span className={`status ${children.toLowerCase().replace(/\s+/g, "-")}`}>
-      {children}
+      {t(children)}
     </span>
   );
 }
@@ -1849,6 +1872,7 @@ function ActiveTripsPage({
   activeDriverFlow?: DriverFlowState | null;
   onResumeFlow: (t: Trip) => void;
 }) {
+  const { t } = useLang();
   const activeTrips = trips.filter((t) =>
     [
       "DRIVER_ACCEPTED",
@@ -1866,7 +1890,7 @@ function ActiveTripsPage({
     <section className="panel list-panel active-panel">
       <div className="panel-header">
         <div>
-          <h2>Active</h2>
+          <h2>{t("Active")}</h2>
           <p>Current live trip work and journey state.</p>
         </div>
       </div>
@@ -1933,6 +1957,7 @@ function Dashboard({
   onRejectTrip?: (t: Trip) => void;
   onResumeFlow?: (t: Trip) => void;
 }) {
+  const { t } = useLang();
   const newTrips = trips.filter((t) => t.status === "NEW");
   const pendingTrips = trips.filter((t) =>
     ["DRIVER_PENDING", "DRIVER_ACCEPTED", "PREPARING"].includes(t.status),
@@ -1973,10 +1998,9 @@ function Dashboard({
       >
         {role !== "Driver" && (
           <Stat
-            label="New Trips"
+            label={t("New Trips")}
             value={newTrips.length}
             tone="blue"
-            hint="Awaiting Ops review"
             icon={<Clock size={18} />}
             onClick={() => onMetricClick("New")}
             alert={role === "Operations" && newTrips.length > 0}
@@ -1984,10 +2008,9 @@ function Dashboard({
         )}
         {role === "Operations" && (
           <Stat
-            label="Pending Fuel Assignments"
+            label={t("Pending Fuel Assignments")}
             value={pendingFuelAssignments.length}
             tone="purple"
-            hint="Awaiting fuel dispatch"
             icon={<GasPump size={18} />}
             onClick={onOpenFuel}
             alert={role === "Operations" && pendingFuelAssignments.length > 0}
@@ -1995,53 +2018,47 @@ function Dashboard({
         )}
         {role === "Super Admin" && (
           <Stat
-            label="Pending Approvals"
+            label={t("Pending Approvals")}
             value={approvalCount}
             tone="red"
-            hint="Awaiting Super Admin review"
             icon={<CheckCircle size={18} />}
             onClick={() => onMetricClick("Pending Approvals")}
             alert={approvalCount > 0}
           />
         )}
         <Stat
-          label="Driver Pending"
+          label={t("Driver Pending")}
           value={pendingTrips.length}
           tone="blue"
-          hint="Assigned · Pre-trip"
           icon={<Truck size={18} />}
           onClick={() => onMetricClick("Driver Pending")}
         />
         <Stat
-          label="Active Trips"
+          label={t("Active Trips")}
           value={activeTrips.length}
           tone="purple"
-          hint="Currently in transit"
           icon={<Truck size={18} />}
           onClick={() => onMetricClick("In Transit")}
         />
         <Stat
-          label="Docs Uploaded"
+          label={t("Docs Uploaded")}
           value={deliveredTrips.length}
           tone="green"
-          hint="Awaiting verification"
           icon={<ChartPie size={18} />}
           onClick={() => onMetricClick("Docs Uploaded")}
         />
         <Stat
-          label="Completed"
+          label={t("Completed")}
           value={completedTrips.length}
           tone="green"
-          hint="Finalized"
           icon={<ChartPie size={18} />}
           onClick={() => onMetricClick("Complete")}
         />
         {role !== "Driver" && (
           <Stat
-            label="Rejected"
+            label={t("Rejected")}
             value={rejectedTrips.length}
             tone="red"
-            hint="Ops / Driver rejected"
             icon={<Clock size={18} />}
             onClick={() => onMetricClick("Rejected (Ops)")}
           />
@@ -2054,7 +2071,6 @@ function Dashboard({
 function Stat({
   label,
   value,
-  hint,
   tone,
   icon,
   onClick,
@@ -2062,7 +2078,6 @@ function Stat({
 }: {
   label: string;
   value: string | number;
-  hint: string;
   tone: string;
   icon?: React.ReactNode;
   onClick?: () => void;
@@ -2101,7 +2116,6 @@ function Stat({
         <strong style={alert ? { color: "#c2410c" } : undefined}>
           {value}
         </strong>
-        <small>{hint}</small>
       </div>
     </button>
   );
@@ -2110,6 +2124,7 @@ function Stat({
 type ApprovalStatus = "Submitted" | "Approved" | "Rejected";
 
 function ApprovalStatusBadge({ status }: { status: ApprovalStatus }) {
+  const { t } = useLang();
   const styles =
     status === "Approved"
       ? { background: "#dcfce7", color: "#15803d" }
@@ -2131,7 +2146,7 @@ function ApprovalStatusBadge({ status }: { status: ApprovalStatus }) {
         ...styles,
       }}
     >
-      {status}
+      {t(status)}
     </span>
   );
 }
@@ -2288,6 +2303,7 @@ function TripList({
   setFilter: (f: string) => void;
   view?: string;
 }) {
+  const { t } = useLang();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [dateFrom, setDateFrom] = useState("");
@@ -2414,51 +2430,30 @@ function TripList({
   }, [filter]);
 
   return (
-    <section className="panel list-panel">
-      <div className="panel-header" />
-      <div
-        className="filters"
-        style={{
-          alignItems: "center",
-          gap: 10,
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap",
-          width: "100%",
-        }}
-      >
-        <div className="search" style={{ flex: 1, minWidth: 0 }}>
+    <div className="table-page-panel">
+      {/* Section 2: search bar + filter icon button */}
+      <div className="table-section-toolbar">
+        <div className="table-search-box">
           <MagnifyingGlass
             size={16}
-            style={{ color: "#9ca6b4", marginRight: 4 }}
+            style={{ color: "#9ca6b4", flexShrink: 0 }}
           />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search reference or customer"
+            placeholder={`${t("Search")} reference or customer...`}
           />
         </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            flexShrink: 0,
-            marginLeft: "auto",
-          }}
-        >
-          <div style={{ position: "relative", flexShrink: 0 }}>
-            <button
-              className="button secondary compact"
-              aria-label="Open filters"
-              title="Filters"
-              onClick={() =>
-                showFilters ? setShowFilters(false) : openFilters()
-              }
-              style={{ minWidth: 36, width: 40, height: 40, padding: "0 8px" }}
-            >
-              <FunnelSimple size={16} />
-            </button>
+        <div style={{ position: "relative" }}>
+          <button
+            className="table-filter-btn"
+            aria-label="Open filters"
+            title={t("Filters")}
+            onClick={() =>
+              showFilters ? setShowFilters(false) : openFilters()
+            }
+          >
+            <FunnelSimple size={16} />
             {activeFilters > 0 && (
               <span
                 style={{
@@ -2479,323 +2474,365 @@ function TripList({
                 {activeFilters}
               </span>
             )}
-            {showFilters && (
-              <>
+          </button>
+          {showFilters && (
+            <>
+              <div
+                role="presentation"
+                onClick={() => setShowFilters(false)}
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(15, 23, 42, 0.18)",
+                  zIndex: 1000,
+                }}
+              />
+              <div
+                role="dialog"
+                aria-label="Trip filters"
+                style={{
+                  position: "fixed",
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  zIndex: 1001,
+                  background: "var(--surface, #fff)",
+                  borderTopLeftRadius: 24,
+                  borderTopRightRadius: 24,
+                  boxShadow: "0 -16px 40px rgba(15, 23, 42, 0.18)",
+                  maxHeight: "85vh",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
                 <div
-                  role="presentation"
-                  onClick={() => setShowFilters(false)}
                   style={{
-                    position: "fixed",
-                    inset: 0,
-                    background: "rgba(15, 23, 42, 0.18)",
-                    zIndex: 30,
+                    width: 42,
+                    height: 4,
+                    borderRadius: 999,
+                    background: "#dbe3ee",
+                    margin: "12px auto 4px",
+                    flexShrink: 0,
                   }}
                 />
                 <div
-                  role="dialog"
-                  aria-label="Trip filters"
                   style={{
-                    position: "fixed",
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    zIndex: 40,
-                    background: "var(--surface, #fff)",
-                    borderTopLeftRadius: 24,
-                    borderTopRightRadius: 24,
-                    boxShadow: "0 -16px 40px rgba(15, 23, 42, 0.18)",
-                    maxHeight: "85vh",
                     display: "flex",
-                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 20px 12px",
+                    borderBottom: "1px solid var(--line)",
+                    flexShrink: 0,
                   }}
                 >
-                  <div
-                    style={{
-                      width: 42,
-                      height: 4,
-                      borderRadius: 999,
-                      background: "#dbe3ee",
-                      margin: "12px auto 4px",
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "8px 20px 12px",
-                      borderBottom: "1px solid var(--line)",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div>
-                      <b style={{ fontSize: 17, color: "var(--ink)" }}>
-                        Filters
-                      </b>
-                      {activeFilters > 0 && (
-                        <span
-                          style={{
-                            fontSize: 12,
-                            color: "var(--muted-ink)",
-                            marginLeft: 8,
-                          }}
-                        >
-                          ({activeFilters} active)
-                        </span>
-                      )}
-                    </div>
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 12 }}
-                    >
-                      <button
-                        type="button"
-                        className="text-button"
+                  <div>
+                    <b style={{ fontSize: 17, color: "var(--ink)" }}>
+                      {t("Filters")}
+                    </b>
+                    {activeFilters > 0 && (
+                      <span
                         style={{
-                          fontSize: 13,
-                          color: "var(--blue)",
-                          fontWeight: 600,
-                        }}
-                        onClick={clearAllFilters}
-                      >
-                        Reset All
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowFilters(false)}
-                        aria-label="Close filters"
-                        style={{
-                          background: "var(--line-light, #f1f5f9)",
-                          border: "none",
-                          borderRadius: "50%",
-                          width: 30,
-                          height: 30,
-                          display: "grid",
-                          placeItems: "center",
-                          cursor: "pointer",
-                          color: "var(--ink)",
+                          fontSize: 12,
+                          color: "var(--muted-ink)",
+                          marginLeft: 8,
                         }}
                       >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      padding: "16px 20px",
-                      overflowY: "auto",
-                      flex: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 20,
-                    }}
-                  >
-                    {activeChips.length > 0 && (
-                      <div>
-                        <p
-                          style={{
-                            margin: "0 0 8px",
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: "var(--muted-ink)",
-                            textTransform: "uppercase",
-                            letterSpacing: ".08em",
-                          }}
-                        >
-                          Active Filters
-                        </p>
-                        <div
-                          style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
-                        >
-                          {activeChips.map((chip) => (
-                            <button
-                              key={chip}
-                              type="button"
-                              className="filter active"
-                              style={{
-                                fontSize: 11,
-                                paddingRight: 10,
-                                borderRadius: 20,
-                              }}
-                              onClick={() => {
-                                if (chip === draftStatus) setDraftStatus("All");
-                                if (chip.startsWith("From "))
-                                  setDraftDateFrom("");
-                                if (chip.startsWith("To ")) setDraftDateTo("");
-                              }}
-                            >
-                              {chip} <span style={{ marginLeft: 6 }}>×</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                        ({activeFilters} {t("Active")})
+                      </span>
                     )}
-
-                    <div>
-                      <p
-                        style={{
-                          margin: "0 0 10px",
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: "var(--muted-ink)",
-                          textTransform: "uppercase",
-                          letterSpacing: ".08em",
-                        }}
-                      >
-                        Trip Status
-                      </p>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns:
-                            "repeat(auto-fill, minmax(130px, 1fr))",
-                          gap: 8,
-                        }}
-                      >
-                        {statusOptions.map((f) => {
-                          const isSelected = draftStatus === f;
-                          return (
-                            <button
-                              key={f}
-                              type="button"
-                              onClick={() => setDraftStatus(f)}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                padding: "10px 12px",
-                                borderRadius: 10,
-                                border: isSelected
-                                  ? "1.5px solid var(--blue)"
-                                  : "1px solid var(--line)",
-                                background: isSelected
-                                  ? "var(--blue-soft, #eff6ff)"
-                                  : "var(--surface)",
-                                color: isSelected
-                                  ? "var(--blue)"
-                                  : "var(--ink)",
-                                fontSize: 13,
-                                fontWeight: isSelected ? 600 : 500,
-                                cursor: "pointer",
-                                transition: "all 0.15s ease",
-                                textAlign: "left",
-                              }}
-                            >
-                              <span>{f}</span>
-                              {isSelected && (
-                                <CheckCircle
-                                  size={15}
-                                  style={{
-                                    color: "var(--blue)",
-                                    flexShrink: 0,
-                                  }}
-                                />
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p
-                        style={{
-                          margin: "0 0 10px",
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: "var(--muted-ink)",
-                          textTransform: "uppercase",
-                          letterSpacing: ".08em",
-                        }}
-                      >
-                        Date Range
-                      </p>
-                      <DateRangeFilter
-                        dateFrom={draftDateFrom}
-                        dateTo={draftDateTo}
-                        onFrom={setDraftDateFrom}
-                        onTo={setDraftDateTo}
-                      />
-                    </div>
                   </div>
-
                   <div
-                    style={{
-                      padding: "12px 20px 16px",
-                      borderTop: "1px solid var(--line)",
-                      background: "var(--surface, #fff)",
-                      display: "flex",
-                      gap: 10,
-                      flexShrink: 0,
-                    }}
+                    style={{ display: "flex", alignItems: "center", gap: 12 }}
                   >
                     <button
-                      className="button secondary"
+                      type="button"
+                      className="text-button"
                       style={{
-                        flex: 1,
-                        padding: "12px",
-                        fontSize: 14,
-                        borderRadius: 10,
+                        fontSize: 13,
+                        color: "var(--blue)",
+                        fontWeight: 600,
                       }}
                       onClick={clearAllFilters}
-                      type="button"
                     >
-                      Clear All
+                      {t("Reset All")}
                     </button>
                     <button
-                      className="button primary"
-                      style={{
-                        flex: 2,
-                        padding: "12px",
-                        fontSize: 14,
-                        borderRadius: 10,
-                        fontWeight: 700,
-                      }}
-                      onClick={applyFilters}
                       type="button"
+                      onClick={() => setShowFilters(false)}
+                      aria-label="Close filters"
+                      style={{
+                        background: "var(--line-light, #f1f5f9)",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: 30,
+                        height: 30,
+                        display: "grid",
+                        placeItems: "center",
+                        cursor: "pointer",
+                        color: "var(--ink)",
+                      }}
                     >
-                      Apply Filters
+                      <X size={16} />
                     </button>
                   </div>
                 </div>
-              </>
-            )}
-          </div>
+
+                <div
+                  style={{
+                    padding: "16px 20px",
+                    overflowY: "auto",
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 20,
+                  }}
+                >
+                  {activeChips.length > 0 && (
+                    <div>
+                      <p
+                        style={{
+                          margin: "0 0 8px",
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: "var(--muted-ink)",
+                          textTransform: "uppercase",
+                          letterSpacing: ".08em",
+                        }}
+                      >
+                        {t("Active Filters")}
+                      </p>
+                      <div
+                        style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+                      >
+                        {activeChips.map((chip) => (
+                          <button
+                            key={chip}
+                            type="button"
+                            className="filter active"
+                            style={{
+                              fontSize: 11,
+                              paddingRight: 10,
+                              borderRadius: 20,
+                            }}
+                            onClick={() => {
+                              if (chip === draftStatus) setDraftStatus("All");
+                              if (chip.startsWith("From "))
+                                setDraftDateFrom("");
+                              if (chip.startsWith("To ")) setDraftDateTo("");
+                            }}
+                          >
+                            {chip} <span style={{ marginLeft: 6 }}>×</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <p
+                      style={{
+                        margin: "0 0 10px",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "var(--muted-ink)",
+                        textTransform: "uppercase",
+                        letterSpacing: ".08em",
+                      }}
+                    >
+                      {t("TRIP STATUS")}
+                    </p>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fill, minmax(130px, 1fr))",
+                        gap: 8,
+                      }}
+                    >
+                      {statusOptions.map((f) => {
+                        const isSelected = draftStatus === f;
+                        return (
+                          <button
+                            key={f}
+                            type="button"
+                            onClick={() => setDraftStatus(f)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "10px 12px",
+                              borderRadius: 10,
+                              border: isSelected
+                                ? "1.5px solid var(--blue)"
+                                : "1px solid var(--line)",
+                              background: isSelected
+                                ? "var(--blue-soft, #eff6ff)"
+                                : "var(--surface)",
+                              color: isSelected
+                                ? "var(--blue)"
+                                : "var(--ink)",
+                              fontSize: 13,
+                              fontWeight: isSelected ? 600 : 500,
+                              cursor: "pointer",
+                              transition: "all 0.15s ease",
+                              textAlign: "left",
+                            }}
+                          >
+                            <span>{t(f)}</span>
+                            {isSelected && (
+                              <CheckCircle
+                                size={15}
+                                style={{
+                                  color: "var(--blue)",
+                                  flexShrink: 0,
+                                }}
+                              />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p
+                      style={{
+                        margin: "0 0 10px",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "var(--muted-ink)",
+                        textTransform: "uppercase",
+                        letterSpacing: ".08em",
+                      }}
+                    >
+                      {t("Date Range")}
+                    </p>
+                    <DateRangeFilter
+                      dateFrom={draftDateFrom}
+                      dateTo={draftDateTo}
+                      onFrom={setDraftDateFrom}
+                      onTo={setDraftDateTo}
+                    />
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: "12px 20px 16px",
+                    borderTop: "1px solid var(--line)",
+                    background: "var(--surface, #fff)",
+                    display: "flex",
+                    gap: 10,
+                    flexShrink: 0,
+                  }}
+                >
+                  <button
+                    className="button secondary"
+                    style={{
+                      flex: 1,
+                      padding: "12px",
+                      fontSize: 14,
+                      borderRadius: 10,
+                    }}
+                    onClick={clearAllFilters}
+                    type="button"
+                  >
+                    {t("Clear All")}
+                  </button>
+                  <button
+                    className="button primary"
+                    style={{
+                      flex: 2,
+                      padding: "12px",
+                      fontSize: 14,
+                      borderRadius: 10,
+                      fontWeight: 700,
+                    }}
+                    onClick={applyFilters}
+                    type="button"
+                  >
+                    {t("Apply Filters")}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
-      {activeChips.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 8,
-            margin: "0 0 10px",
-          }}
-        >
-          {activeChips.map((chip) => (
-            <button
-              key={chip}
-              className="filter active"
-              style={{ fontSize: 11, paddingRight: 10 }}
-              onClick={() => {
-                if (chip === statusFilter) setStatusFilter("All");
-                if (chip.startsWith("From ")) setDateFrom("");
-                if (chip.startsWith("To ")) setDateTo("");
-              }}
-            >
-              {chip} <span style={{ marginLeft: 6 }}>×</span>
-            </button>
-          ))}
-        </div>
-      )}
-      {sorted.map((t) => (
-        <div key={t.id}>
-          <TripRow trip={t} onClick={() => onOpen(t)} />
-        </div>
-      ))}
-      {!sorted.length && <Empty label="No trips match" />}
-    </section>
+
+      {/* Section 3: Table column header & Section 4: Table rows */}
+      <div className="table-scroll-container">
+        <table className="table-ui">
+          <thead>
+            <tr>
+              {[
+                t("Date"),
+                t("Reference & Customer"),
+                t("Route"),
+                t("Driver"),
+                t("Status"),
+                t("Action"),
+              ].map((h) => (
+                <th key={h}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((t) => (
+              <tr
+                key={t.id}
+                style={{ cursor: "pointer" }}
+                onClick={() => onOpen(t)}
+              >
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <b>{t.date.split(" ")[0]}</b>{" "}
+                  <small style={{ color: "var(--muted-ink)" }}>
+                    {t.date.split(" ")[1]}
+                  </small>
+                </td>
+                <td>
+                  <b style={{ color: "var(--ink)" }}>{t.reference}</b>
+                  {t.customer && (
+                    <small style={{ display: "block", color: "var(--muted-ink)" }}>
+                      {t.customer}
+                    </small>
+                  )}
+                </td>
+                <td>
+                  <span style={{ fontWeight: 500 }}>{t.origin}</span>
+                  <ArrowRight
+                    size={12}
+                    style={{ display: "inline", margin: "0 4px", color: "#a4adba" }}
+                  />
+                  <span style={{ color: "var(--muted-ink)" }}>{t.destination}</span>
+                </td>
+                <td>{t.driver || "—"}</td>
+                <td>
+                  <StatusBadge status={t.status} />
+                </td>
+                <td style={{ textAlign: "center", color: "#a6afbb" }}>
+                  <CaretRight size={16} />
+                </td>
+              </tr>
+            ))}
+            {!sorted.length && (
+              <tr>
+                <td
+                  colSpan={6}
+                  style={{
+                    padding: "2rem",
+                    textAlign: "center",
+                    color: "#94a3b8",
+                  }}
+                >
+                  No trips match the selected filter.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
@@ -3618,9 +3655,10 @@ function TripDetail({
           </div>
         )}
 
-        {/* Operations/Admin: verify documents → complete */}
+        {/* Operations/Admin: verify documents → complete (only after final stamped docs uploaded stage) */}
         {(role === "Operations" || role === "Super Admin") &&
-          trip.status === "DOCUMENTS_SUBMITTED" && (
+          (trip.status === "STAMPED_DOCS_SUBMITTED" ||
+            trip.documents.some((d) => d.type.includes("(stamped)"))) && (
             <div className="panel action-panel">
               <h2>Verify Documents</h2>
               <p
@@ -3809,7 +3847,7 @@ function FilterModal({
       className="modal-backdrop"
       onClick={onClose}
       style={{
-        zIndex: 100,
+        zIndex: 1000,
         display: "flex",
         alignItems: "flex-end",
         justifyContent: "center",
@@ -5038,6 +5076,7 @@ function TripOpsReport({
   onOpenTrip?: (trip: Trip) => void;
   onMetricClick?: (filter: string) => void;
 }) {
+  const { t } = useLang();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string>("All");
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -5073,11 +5112,12 @@ function TripOpsReport({
                 : r.status === selectedFilter;
     const q = searchQuery.toLowerCase().trim();
     return (
-      !q ||
-      r.id.toLowerCase().includes(q) ||
-      r.source.toLowerCase().includes(q) ||
-      r.destination.toLowerCase().includes(q) ||
-      r.driver.toLowerCase().includes(q)
+      matchesStatus &&
+      (!q ||
+        r.id.toLowerCase().includes(q) ||
+        r.source.toLowerCase().includes(q) ||
+        r.destination.toLowerCase().includes(q) ||
+        r.driver.toLowerCase().includes(q))
     );
   });
 
@@ -5103,23 +5143,23 @@ function TripOpsReport({
   };
 
   const tripFilterOptions = [
-    { id: "All", label: "All" },
-    { id: "Waiting for Driver", label: "Waiting for Driver" },
-    { id: "Driver Accepted", label: "Driver Accepted" },
-    { id: "In Transit", label: "In Transit" },
-    { id: "Delivered", label: "Delivered" },
-    { id: "Rejected", label: "Rejected" },
+    { id: "All", label: t("All") },
+    { id: "Waiting for Driver", label: t("Driver Pending") },
+    { id: "Driver Accepted", label: t("Accepted") },
+    { id: "In Transit", label: t("In Transit") },
+    { id: "Delivered", label: t("Reached") },
+    { id: "Rejected", label: t("Rejected") },
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+    <div className="table-page-panel">
       <FilterModal
         isOpen={showFilterModal}
         onClose={() => setShowFilterModal(false)}
-        title="Filters"
+        title={t("Filters")}
         sections={[
           {
-            title: "TRIP STATUS",
+            title: t("TRIP STATUS"),
             options: tripFilterOptions,
             selected: selectedFilter,
             onSelect: (id) => setSelectedFilter(id),
@@ -5128,173 +5168,125 @@ function TripOpsReport({
         onClearAll={() => setSelectedFilter("All")}
       />
 
-      <div className="panel">
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 14,
-          }}
+      {/* Section 2: search bar + filter icon button & download button */}
+      <div className="table-section-toolbar">
+        <div className="table-search-box">
+          <MagnifyingGlass
+            size={16}
+            style={{ color: "#9ca6b4", flexShrink: 0 }}
+          />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={`${t("Search")} trip ID, source, destination, driver...`}
+          />
+        </div>
+        <button
+          className="table-filter-btn"
+          onClick={() => setShowFilterModal(true)}
+          title={t("Filters")}
+          aria-label={t("Filters")}
         >
-          <div className="search" style={{ flex: 1, minWidth: 0 }}>
-            <MagnifyingGlass
-              size={16}
-              style={{ color: "#9ca6b4", marginRight: 4 }}
-            />
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search trip ID, source, destination, driver..."
-            />
-          </div>
-          <button
-            className="button secondary compact"
-            onClick={() => setShowFilterModal(true)}
-            title="Filters"
-            aria-label="Filters"
-            style={{ minWidth: 36, padding: "0 8px", position: "relative" }}
-          >
-            <FunnelSimple size={16} />
-            {selectedFilter !== "All" && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: -4,
-                  right: -4,
-                  background: "#2563eb",
-                  color: "#fff",
-                  borderRadius: "50%",
-                  width: 14,
-                  height: 14,
-                  fontSize: 9,
-                  display: "grid",
-                  placeItems: "center",
-                  fontWeight: 700,
-                }}
-              >
-                1
-              </span>
-            )}
-          </button>
-          <button
-            className="button secondary compact"
-            onClick={handleDownloadExcel}
-            title="Download Excel (.xlsx)"
-            aria-label="Download Excel"
-            style={{ minWidth: 36, padding: "0 8px" }}
-          >
-            <DownloadSimple size={16} />
-          </button>
-        </div>
+          <FunnelSimple size={16} />
+          {selectedFilter !== "All" && (
+            <span
+              style={{
+                position: "absolute",
+                top: -4,
+                right: -4,
+                background: "#2563eb",
+                color: "#fff",
+                borderRadius: "50%",
+                width: 14,
+                height: 14,
+                fontSize: 9,
+                display: "grid",
+                placeItems: "center",
+                fontWeight: 700,
+              }}
+            >
+              1
+            </span>
+          )}
+        </button>
+        <button
+          className="table-filter-btn"
+          onClick={handleDownloadExcel}
+          title={t("Download")}
+          aria-label={t("Download")}
+        >
+          <DownloadSimple size={16} />
+        </button>
+      </div>
 
-        <div style={{ overflowX: "auto" }}>
-          <table
-            style={{
-              width: "100%",
-              fontSize: "0.875rem",
-              borderCollapse: "collapse",
-            }}
-          >
-            <thead>
-              <tr
-                style={{
-                  background: "#f8fafc",
-                  borderBottom: "1px solid #f1f5f9",
-                }}
-              >
-                {[
-                  "Trip ID",
-                  "Source",
-                  "Destination",
-                  "Cargo",
-                  "Driver",
-                  "Status",
-                  "Est Delivery",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      textAlign: "left",
-                      padding: "0.75rem 1rem",
-                      fontSize: "0.75rem",
-                      fontWeight: 600,
-                      color: "#64748b",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRows.map((row) => (
-                <tr
-                  key={row.id}
-                  style={{
-                    borderBottom: "1px solid #f8fafc",
-                    cursor: onOpenTrip ? "pointer" : "default",
-                  }}
-                  onClick={() => onOpenTrip && onOpenTrip(row.trip)}
-                  title={onOpenTrip ? `View details for ${row.id}` : undefined}
-                >
-                  <td
-                    style={{
-                      padding: "0.75rem 1rem",
-                      fontFamily: "monospace",
-                      fontSize: "0.75rem",
-                      color: "#0f172a",
-                      fontWeight: 700,
-                    }}
-                  >
-                    {row.id}
-                  </td>
-                  <td style={{ padding: "0.75rem 1rem", fontWeight: 500 }}>
-                    {row.source}
-                  </td>
-                  <td style={{ padding: "0.75rem 1rem", color: "#475569" }}>
-                    {row.destination}
-                  </td>
-                  <td style={{ padding: "0.75rem 1rem", color: "#475569" }}>
-                    {row.loadType} · {row.weight}
-                  </td>
-                  <td style={{ padding: "0.75rem 1rem", color: "#475569" }}>
-                    {row.driver}
-                  </td>
-                  <td style={{ padding: "0.75rem 1rem", whiteSpace: "nowrap" }}>
-                    <Status>{getStatusLabel(row.status)}</Status>
-                  </td>
-                  <td
-                    style={{
-                      padding: "0.75rem 1rem",
-                      color: "#475569",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {row.delivery}
-                  </td>
-                </tr>
+      {/* Section 3: Table column header & Section 4: Table rows */}
+      <div className="table-scroll-container">
+        <table className="table-ui">
+          <thead>
+            <tr>
+              {[
+                t("Trip Ref"),
+                t("Route"),
+                t("Destination"),
+                t("Expense Type"),
+                t("Driver"),
+                t("Status"),
+                t("Due Date & Time"),
+              ].map((h) => (
+                <th key={h}>{h}</th>
               ))}
-              {!filteredRows.length && (
-                <tr>
-                  <td
-                    colSpan={7}
-                    style={{
-                      padding: "2rem",
-                      textAlign: "center",
-                      color: "#94a3b8",
-                    }}
-                  >
-                    No trips match the filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredRows.map((row) => (
+              <tr
+                key={row.id}
+                style={{
+                  cursor: onOpenTrip ? "pointer" : "default",
+                }}
+                onClick={() => onOpenTrip && onOpenTrip(row.trip)}
+                title={onOpenTrip ? `View details for ${row.id}` : undefined}
+              >
+                <td
+                  style={{
+                    fontFamily: "monospace",
+                    fontSize: "0.75rem",
+                    color: "#0f172a",
+                    fontWeight: 700,
+                  }}
+                >
+                  {row.id}
+                </td>
+                <td style={{ fontWeight: 500 }}>{row.source}</td>
+                <td style={{ color: "#475569" }}>{row.destination}</td>
+                <td style={{ color: "#475569" }}>
+                  {row.loadType} · {row.weight}
+                </td>
+                <td style={{ color: "#475569" }}>{row.driver}</td>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <Status>{getStatusLabel(row.status)}</Status>
+                </td>
+                <td style={{ color: "#475569", whiteSpace: "nowrap" }}>
+                  {row.delivery}
+                </td>
+              </tr>
+            ))}
+            {!filteredRows.length && (
+              <tr>
+                <td
+                  colSpan={7}
+                  style={{
+                    padding: "2rem",
+                    textAlign: "center",
+                    color: "#94a3b8",
+                  }}
+                >
+                  No trips match the filters.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -5683,6 +5675,7 @@ function CashAdvancesPage({
     status?: "Approved" | "All",
   ) => void;
 }) {
+  const { t } = useLang();
   const cashRecords = extras.filter((e) => e.type === "Cash");
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [query, setQuery] = useState("");
@@ -5726,17 +5719,17 @@ function CashAdvancesPage({
     );
   });
   return (
-    <div className="panel">
+    <div className="table-page-panel">
       <FilterModal
         isOpen={showFilters}
         onClose={() => setShowFilters(false)}
-        title="Filters"
+        title={t("Filters")}
         sections={[
           {
-            title: "STATUS",
+            title: t("STATUS"),
             options: ["All", "Submitted", "Approved", "Rejected"].map((id) => ({
               id,
-              label: id,
+              label: t(id),
             })),
             selected: statusFilter,
             onSelect: (id) => setStatusFilter(id),
@@ -5744,32 +5737,25 @@ function CashAdvancesPage({
         ]}
         onClearAll={() => setStatusFilter("All")}
       />
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 14,
-          flexWrap: "wrap",
-        }}
-      >
-        <div className="search" style={{ flex: 1, minWidth: 0 }}>
+
+      {/* Toolbar: search bar + filter icon button & download button */}
+      <div className="table-section-toolbar">
+        <div className="table-search-box">
           <MagnifyingGlass
             size={16}
-            style={{ color: "#9ca6b4", marginRight: 4 }}
+            style={{ color: "#9ca6b4", flexShrink: 0 }}
           />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search trip, driver, reason..."
+            placeholder={`${t("Search")} trip, driver, reason...`}
           />
         </div>
         <button
-          className="button secondary compact"
+          className="table-filter-btn"
           onClick={() => setShowFilters(true)}
-          title="Filters"
-          aria-label="Filters"
-          style={{ minWidth: 36, padding: "0 8px", position: "relative" }}
+          title={t("Filters")}
+          aria-label={t("Filters")}
         >
           <FunnelSimple size={16} />
           {statusFilter !== "All" && (
@@ -5794,39 +5780,31 @@ function CashAdvancesPage({
           )}
         </button>
         <button
-          className="button secondary compact"
+          className="table-filter-btn"
           onClick={handleDownloadExcel}
-          title="Download Excel (.xlsx)"
-          aria-label="Download Excel"
-          style={{ minWidth: 36, padding: "0 8px" }}
+          title={t("Download")}
+          aria-label={t("Download")}
         >
           <DownloadSimple size={16} />
         </button>
       </div>
-      <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", minWidth: "max-content", borderCollapse: "collapse" }}>
+
+      {/* Section 3: Table column header & Section 4: Table rows */}
+      <div className="table-scroll-container">
+        <table className="table-ui">
           <thead>
             <tr>
               {[
-                "Trip ID",
-                "Driver",
-                "Truck",
-                "Req Amt",
-                "Reason",
-                "Req Date",
-                "Appr Date",
-                "Status",
+                t("Trip Ref"),
+                t("Driver"),
+                t("Vehicle Number"),
+                t("Amount"),
+                t("Follow-up Note"),
+                t("Requested Date"),
+                t("Date"),
+                t("Status"),
               ].map((h) => (
-                <th
-                  key={h}
-                  style={{
-                    textAlign: "left",
-                    padding: "0.75rem 1rem",
-                    fontSize: "0.75rem",
-                  }}
-                >
-                  {h}
-                </th>
+                <th key={h}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -5835,24 +5813,24 @@ function CashAdvancesPage({
               const trip = trips.find((t) => t.id === row.tripId);
               return (
                 <tr key={row.id}>
-                  <td style={{ padding: "0.75rem 1rem" }}>
+                  <td style={{ fontFamily: "monospace", fontSize: "0.75rem", fontWeight: 700 }}>
                     {row.tripRef || trip?.reference}
                   </td>
-                  <td style={{ padding: "0.75rem 1rem" }}>
+                  <td style={{ fontWeight: 500 }}>
                     {row.driver || trip?.driver}
                   </td>
-                  <td style={{ padding: "0.75rem 1rem" }}>
+                  <td style={{ fontFamily: "monospace", color: "#64748b" }}>
                     {trip?.truck?.number || "—"}
                   </td>
-                  <td style={{ padding: "0.75rem 1rem" }}>{row.amount}</td>
-                  <td style={{ padding: "0.75rem 1rem" }}>{row.note}</td>
-                  <td style={{ padding: "0.75rem 1rem" }}>
+                  <td style={{ fontWeight: 600 }}>{row.amount}</td>
+                  <td style={{ color: "#475569" }}>{row.note}</td>
+                  <td style={{ color: "#64748b", whiteSpace: "nowrap" }}>
                     {formatDDMMYY(row.requestedAt)}
                   </td>
-                  <td style={{ padding: "0.75rem 1rem" }}>
+                  <td style={{ color: "#64748b", whiteSpace: "nowrap" }}>
                     {formatDDMMYY(row.approvedAt)}
                   </td>
-                  <td style={{ padding: "0.75rem 1rem" }}>
+                  <td>
                     <ApprovalStatusBadge status={row.status} />
                   </td>
                 </tr>
@@ -5897,8 +5875,12 @@ function FuelReportsPage({
 }) {
   const [tab, setTab] = useState<"basic" | "extra">(initialTab);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [query, setQuery] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+
   useEffect(() => setTab(initialTab), [initialTab]);
   useEffect(() => setStatusFilter(initialStatus), [initialStatus]);
+
   const extraFuelRows = extras
     .filter((x) => x.type === "Fuel")
     .map((x) => ({
@@ -5906,6 +5888,7 @@ function FuelReportsPage({
       tripRef:
         x.tripRef || trips.find((t) => t.id === x.tripId)?.reference || "",
     }));
+
   const basicFuelRows = trips.map((t) => ({
     trip: t.reference,
     driver: t.driver || "Unassigned",
@@ -5915,11 +5898,34 @@ function FuelReportsPage({
     cash: t.cash?.advance || "—",
     extraFuel: (t.extras || []).some((x) => x.type === "Fuel"),
   }));
+
+  const filteredBasic = basicFuelRows.filter((r) => {
+    const q = query.toLowerCase().trim();
+    return (
+      !q ||
+      r.trip.toLowerCase().includes(q) ||
+      r.driver.toLowerCase().includes(q) ||
+      r.truck.toLowerCase().includes(q)
+    );
+  });
+
+  const filteredExtra = extraFuelRows.filter((r) => {
+    const matchesStatus = statusFilter === "All" || r.status === statusFilter;
+    const q = query.toLowerCase().trim();
+    return (
+      matchesStatus &&
+      (!q ||
+        r.tripRef.toLowerCase().includes(q) ||
+        r.type.toLowerCase().includes(q) ||
+        r.note.toLowerCase().includes(q))
+    );
+  });
+
   const handleDownloadExcel = async () => {
     const XLSX = await import("xlsx");
     const data =
       tab === "basic"
-        ? basicFuelRows.map((r) => ({
+        ? filteredBasic.map((r) => ({
             Trip: r.trip,
             Driver: r.driver,
             Truck: r.truck,
@@ -5928,7 +5934,7 @@ function FuelReportsPage({
             "Cash Advance": r.cash,
             "Extra Fuel": r.extraFuel ? "Yes" : "No",
           }))
-        : extraFuelRows.map((r) => ({
+        : filteredExtra.map((r) => ({
             "Trip ID": r.tripRef || "—",
             Type: r.type,
             Amount: r.amount,
@@ -5948,82 +5954,218 @@ function FuelReportsPage({
       `Fuel_Report_${tab}_${new Date().toISOString().slice(0, 10)}.xlsx`,
     );
   };
+
   return (
-    <div className="panel">
-      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-        <button className={tab === "basic" ? "filter active" : "filter"} onClick={() => setTab("basic")}>
-          Basic Fuel
-        </button>
-        <button className={tab === "extra" ? "filter active" : "filter"} onClick={() => setTab("extra")}>
-          Extra Fuel
-        </button>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+    <div className="table-page-panel">
+      <FilterModal
+        isOpen={showFilters}
+        onClose={() => setShowFilters(false)}
+        title="Filters"
+        sections={[
+          {
+            title: "STATUS",
+            options: ["All", "Submitted", "Approved", "Rejected"].map((id) => ({
+              id,
+              label: id,
+            })),
+            selected: statusFilter,
+            onSelect: (id) => setStatusFilter(id),
+          },
+        ]}
+        onClearAll={() => setStatusFilter("All")}
+      />
+
+      {/* Section 1: Tab bars (if any) + download button (if any) */}
+      <div className="table-section-top">
+        <div className="table-tab-bar">
           <button
-            className="button secondary compact"
-            onClick={() => setStatusFilter("All")}
-            title="Filter"
-            aria-label="Filter"
-            style={{ minWidth: 36, padding: "0 8px" }}
+            className={tab === "basic" ? "filter active" : "filter"}
+            onClick={() => setTab("basic")}
+            style={{ padding: "6px 14px", borderRadius: 6 }}
           >
-            <FunnelSimple size={16} />
+            Basic Fuel
           </button>
+          <button
+            className={tab === "extra" ? "filter active" : "filter"}
+            onClick={() => setTab("extra")}
+            style={{ padding: "6px 14px", borderRadius: 6 }}
+          >
+            Extra Fuel
+          </button>
+        </div>
+        <div className="table-top-actions">
           <button
             className="button secondary compact"
             onClick={handleDownloadExcel}
             title="Download Excel (.xlsx)"
             aria-label="Download Excel"
-            style={{ minWidth: 36, padding: "0 8px" }}
           >
             <DownloadSimple size={16} />
+            <span>Download</span>
           </button>
         </div>
       </div>
-      <div style={{ overflowX: "auto" }}>
+
+      {/* Section 2: search bar + filter icon button */}
+      <div className="table-section-toolbar">
+        <div className="table-search-box">
+          <MagnifyingGlass
+            size={16}
+            style={{ color: "#9ca6b4", flexShrink: 0 }}
+          />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search fuel report records..."
+          />
+        </div>
+        <button
+          className="table-filter-btn"
+          onClick={() => setShowFilters(true)}
+          title="Filters"
+          aria-label="Filters"
+        >
+          <FunnelSimple size={16} />
+          {statusFilter !== "All" && (
+            <span
+              style={{
+                position: "absolute",
+                top: -4,
+                right: -4,
+                background: "#2563eb",
+                color: "#fff",
+                borderRadius: "50%",
+                width: 14,
+                height: 14,
+                fontSize: 9,
+                display: "grid",
+                placeItems: "center",
+                fontWeight: 700,
+              }}
+            >
+              1
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Section 3: Table column header & Section 4: Table rows */}
+      <div className="table-scroll-container">
         {tab === "basic" ? (
-          <table style={{ width: "100%", minWidth: "max-content", borderCollapse: "collapse" }}>
+          <table className="table-ui">
             <thead>
-              <tr style={{ background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
-                {["Trip","Driver","Truck","Fuel Authorized","Fuel Recorded","Cash Advance","Extra Fuel"].map((h) => (
-                  <th key={h} style={{ textAlign: "left", padding: "0.75rem 1rem", fontSize: "0.75rem", fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
+              <tr>
+                {[
+                  "Trip",
+                  "Driver",
+                  "Truck",
+                  "Fuel Authorized",
+                  "Fuel Recorded",
+                  "Cash Advance",
+                  "Extra Fuel",
+                ].map((h) => (
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {basicFuelRows.map((row) => (
-                <tr key={row.trip} style={{ borderBottom: "1px solid #f8fafc" }}>
-                  <td style={{ padding: "0.75rem 1rem", fontFamily: "monospace", fontSize: "0.75rem", color: "#64748b" }}>{row.trip}</td>
-                  <td style={{ padding: "0.75rem 1rem", fontWeight: 500 }}>{row.driver}</td>
-                  <td style={{ padding: "0.75rem 1rem", color: "#475569", fontFamily: "monospace", fontSize: "0.75rem" }}>{row.truck}</td>
-                  <td style={{ padding: "0.75rem 1rem", color: "#475569" }}>{row.fuelAuth}</td>
-                  <td style={{ padding: "0.75rem 1rem", color: "#475569" }}>{row.fuelRec}</td>
-                  <td style={{ padding: "0.75rem 1rem", fontWeight: 500 }}>{row.cash}</td>
-                  <td style={{ padding: "0.75rem 1rem" }}>{row.extraFuel ? <span style={{ color: "#d97706", fontWeight: 600 }}>Yes</span> : <span style={{ color: "#94a3b8" }}>No</span>}</td>
+              {filteredBasic.map((row) => (
+                <tr key={row.trip}>
+                  <td
+                    style={{
+                      fontFamily: "monospace",
+                      fontSize: "0.75rem",
+                      color: "#64748b",
+                    }}
+                  >
+                    {row.trip}
+                  </td>
+                  <td style={{ fontWeight: 500 }}>{row.driver}</td>
+                  <td
+                    style={{
+                      color: "#475569",
+                      fontFamily: "monospace",
+                      fontSize: "0.75rem",
+                    }}
+                  >
+                    {row.truck}
+                  </td>
+                  <td style={{ color: "#475569" }}>{row.fuelAuth}</td>
+                  <td style={{ color: "#475569" }}>{row.fuelRec}</td>
+                  <td style={{ fontWeight: 500 }}>{row.cash}</td>
+                  <td>
+                    {row.extraFuel ? (
+                      <span style={{ color: "#d97706", fontWeight: 600 }}>
+                        Yes
+                      </span>
+                    ) : (
+                      <span style={{ color: "#94a3b8" }}>No</span>
+                    )}
+                  </td>
                 </tr>
               ))}
-              {!basicFuelRows.length && <tr><td colSpan={7} style={{ padding: "2rem", textAlign: "center", color: "#94a3b8" }}>No basic fuel records available.</td></tr>}
+              {!filteredBasic.length && (
+                <tr>
+                  <td
+                    colSpan={7}
+                    style={{
+                      padding: "2rem",
+                      textAlign: "center",
+                      color: "#94a3b8",
+                    }}
+                  >
+                    No basic fuel records available.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         ) : (
-          <table style={{ width: "100%", minWidth: "max-content", borderCollapse: "collapse" }}>
+          <table className="table-ui">
             <thead>
-              <tr style={{ background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
-                {["Trip ID","Type","Amount","Litres","Note","Status"].map((h) => (
-                  <th key={h} style={{ textAlign: "left", padding: "0.75rem 1rem", fontSize: "0.75rem", fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
-                ))}
+              <tr>
+                {["Trip ID", "Type", "Amount", "Litres", "Note", "Status"].map(
+                  (h) => (
+                    <th key={h}>{h}</th>
+                  ),
+                )}
               </tr>
             </thead>
             <tbody>
-              {extraFuelRows.map((row) => (
-                <tr key={row.id} style={{ borderBottom: "1px solid #f8fafc" }}>
-                  <td style={{ padding: "0.75rem 1rem", fontFamily: "monospace", fontSize: "0.75rem", color: "#64748b" }}>{row.tripRef || "—"}</td>
-                  <td style={{ padding: "0.75rem 1rem", fontWeight: 500 }}>{row.type}</td>
-                  <td style={{ padding: "0.75rem 1rem", color: "#475569" }}>{row.amount}</td>
-                  <td style={{ padding: "0.75rem 1rem", color: "#475569" }}>{row.litres || "—"}</td>
-                  <td style={{ padding: "0.75rem 1rem", color: "#475569" }}>{row.note}</td>
-                  <td style={{ padding: "0.75rem 1rem" }}><ApprovalStatusBadge status={row.status} /></td>
+              {filteredExtra.map((row) => (
+                <tr key={row.id}>
+                  <td
+                    style={{
+                      fontFamily: "monospace",
+                      fontSize: "0.75rem",
+                      color: "#64748b",
+                    }}
+                  >
+                    {row.tripRef || "—"}
+                  </td>
+                  <td style={{ fontWeight: 500 }}>{row.type}</td>
+                  <td style={{ color: "#475569" }}>{row.amount}</td>
+                  <td style={{ color: "#475569" }}>{row.litres || "—"}</td>
+                  <td style={{ color: "#475569" }}>{row.note}</td>
+                  <td>
+                    <ApprovalStatusBadge status={row.status} />
+                  </td>
                 </tr>
               ))}
-              {!extraFuelRows.length && <tr><td colSpan={6} style={{ padding: "2rem", textAlign: "center", color: "#94a3b8" }}>No extra fuel records available.</td></tr>}
+              {!filteredExtra.length && (
+                <tr>
+                  <td
+                    colSpan={6}
+                    style={{
+                      padding: "2rem",
+                      textAlign: "center",
+                      color: "#94a3b8",
+                    }}
+                  >
+                    No extra fuel records available.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         )}
@@ -6053,45 +6195,172 @@ function ApprovalsHub({
     status?: string,
   ) => void;
 }) {
-  const pendingList = extras.filter((x) => x.status === "Submitted");
+  const { t } = useLang();
+  const [typeFilter, setTypeFilter] = useState<"All" | "Fuel" | "Cash" | "AdBlue">(
+    initialFilter,
+  );
+  const [query, setQuery] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    setTypeFilter(initialFilter);
+  }, [initialFilter]);
+
+  const filtered = extras.filter((x) => {
+    const matchesType = typeFilter === "All" || x.type === typeFilter;
+    const trip = trips.find((t) => t.id === x.tripId);
+    const tripRef = x.tripRef || trip?.reference || "";
+    const driver = x.driver || trip?.driver || "";
+    const q = query.toLowerCase().trim();
+    return (
+      matchesType &&
+      (!q ||
+        tripRef.toLowerCase().includes(q) ||
+        driver.toLowerCase().includes(q) ||
+        x.note.toLowerCase().includes(q))
+    );
+  });
+
   return (
-    <div className="panel">
-      <div className="panel-header"></div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {pendingList.map((item) => (
-          <div
-            key={item.id}
-            style={{
-              border: "1px solid var(--line)",
-              borderRadius: 12,
-              padding: 16,
-            }}
-          >
-            <b>
-              {item.tripRef ||
-                trips.find((t) => t.id === item.tripId)?.reference ||
-                "—"}
-            </b>
-            <div style={{ marginTop: 6 }}>
-              {item.type} · {item.amount}
-            </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <button
-                className="button primary compact"
-                onClick={() => onApprove(item.id)}
-              >
-                Accept
-              </button>
-              <button
-                className="button danger compact"
-                onClick={() => onReject(item.id)}
-              >
-                Reject
-              </button>
-            </div>
-          </div>
-        ))}
-        {!pendingList.length && <Empty label="No pending approvals." />}
+    <div className="table-page-panel">
+      <FilterModal
+        isOpen={showFilters}
+        onClose={() => setShowFilters(false)}
+        title={t("Filters")}
+        sections={[
+          {
+            title: t("EXPENSE TYPE"),
+            options: ["All", "Fuel", "Cash", "AdBlue"].map((id) => ({
+              id,
+              label: t(id),
+            })),
+            selected: typeFilter,
+            onSelect: (id) => setTypeFilter(id as any),
+          },
+        ]}
+        onClearAll={() => setTypeFilter("All")}
+      />
+
+      {/* Section 2: search bar + filter icon button */}
+      <div className="table-section-toolbar">
+        <div className="table-search-box">
+          <MagnifyingGlass
+            size={16}
+            style={{ color: "#9ca6b4", flexShrink: 0 }}
+          />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={`${t("Search")} approvals by trip, driver, note...`}
+          />
+        </div>
+        <button
+          className="table-filter-btn"
+          onClick={() => setShowFilters(true)}
+          title={t("Filters")}
+          aria-label={t("Filters")}
+        >
+          <FunnelSimple size={16} />
+          {typeFilter !== "All" && (
+            <span
+              style={{
+                position: "absolute",
+                top: -4,
+                right: -4,
+                background: "#2563eb",
+                color: "#fff",
+                borderRadius: "50%",
+                width: 14,
+                height: 14,
+                fontSize: 9,
+                display: "grid",
+                placeItems: "center",
+                fontWeight: 700,
+              }}
+            >
+              1
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Section 3: Table column header & Section 4: Table rows */}
+      <div className="table-scroll-container">
+        <table className="table-ui">
+          <thead>
+            <tr>
+              {[
+                t("Trip Ref"),
+                t("Expense Type"),
+                t("Amount"),
+                t("Follow-up Note"),
+                t("Status"),
+                t("Action"),
+              ].map((h) => (
+                <th key={h}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((item) => {
+              const trip = trips.find((t) => t.id === item.tripId);
+              return (
+                <tr key={item.id}>
+                  <td style={{ fontFamily: "monospace", fontWeight: 700 }}>
+                    {item.tripRef || trip?.reference || "—"}
+                  </td>
+                  <td style={{ fontWeight: 500 }}>{item.type}</td>
+                  <td style={{ fontWeight: 600 }}>{item.amount}</td>
+                  <td style={{ color: "#475569" }}>
+                    {item.litres ? `${item.litres} · ` : ""}
+                    {item.note || "—"}
+                  </td>
+                  <td>
+                    <ApprovalStatusBadge status={item.status} />
+                  </td>
+                  <td>
+                    {item.status === "Submitted" ? (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          className="button primary compact"
+                          onClick={() => onApprove(item.id)}
+                          style={{ padding: "4px 10px", fontSize: 11 }}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          className="button danger compact"
+                          onClick={() => onReject(item.id)}
+                          style={{ padding: "4px 10px", fontSize: 11 }}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    ) : (
+                      <span style={{ color: "#94a3b8", fontSize: 11 }}>
+                        Processed
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+            {!filtered.length && (
+              <tr>
+                <td
+                  colSpan={6}
+                  style={{
+                    padding: "2rem",
+                    textAlign: "center",
+                    color: "#94a3b8",
+                  }}
+                >
+                  No approval requests match the criteria.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -6118,6 +6387,7 @@ function FollowupsPage({
   onCreate: () => void;
   view?: string;
 }) {
+  const { t } = useLang();
   const [query, setQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [tripFilter, setTripFilter] = useState(defaultTripFilter || "All");
@@ -6191,227 +6461,105 @@ function FollowupsPage({
   const activeFilters =
     (tripFilter !== "All" ? 1 : 0) + (statusFilter !== "All" ? 1 : 0);
   return (
-    <section className="panel list-panel">
-      <div className="panel-header">
-        <div>
-          <h2>Follow-ups</h2>
-          <p>Field communication and driver follow-up log.</p>
-        </div>
-        <div className="panel-header-actions">
-          <button
-            className="icon-create"
-            aria-label="New follow-up"
-            title="New follow-up"
-            onClick={onCreate}
-          >
-            <Plus size={16} />
-          </button>
-        </div>
-      </div>
-      <div
-        className="filters"
-        style={{ position: "relative", flexWrap: "wrap", gap: 8 }}
-      >
-        <div className="search" style={{ flex: 1, minWidth: 180 }}>
+    <div className="table-page-panel">
+      {/* Toolbar: search bar + new follow-up */}
+      <div className="table-section-toolbar">
+        <div className="table-search-box">
           <MagnifyingGlass
             size={16}
-            style={{ color: "#9ca6b4", marginRight: 4 }}
+            style={{ color: "#9ca6b4", flexShrink: 0 }}
           />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search driver, trip, note"
+            placeholder={`${t("Search")} driver, trip, note...`}
           />
         </div>
         <button
-          className="icon-create"
-          title="Filter"
-          aria-label="Filter"
-          onClick={() => setShowFilters((v) => !v)}
-          style={{ position: "relative" }}
+          className="button primary compact"
+          onClick={onCreate}
+          title={t("New Follow-up")}
         >
-          <WarningCircle size={15} />
-          {activeFilters > 0 && (
-            <span
-              style={{
-                position: "absolute",
-                top: -4,
-                right: -4,
-                background: "var(--blue)",
-                color: "white",
-                borderRadius: "50%",
-                width: 14,
-                height: 14,
-                fontSize: 8,
-                display: "grid",
-                placeItems: "center",
-                fontWeight: 700,
-              }}
-            >
-              {activeFilters}
-            </span>
-          )}
+          <Plus size={16} />
+          <span>{t("New Follow-up")}</span>
         </button>
-        <button
-          className="icon-create"
-          title={sortAsc ? "Sort: oldest due first" : "Sort: newest due first"}
-          aria-label="Sort"
-          onClick={() => setSortAsc((v) => !v)}
-        >
-          <ArrowRight
-            size={15}
-            style={{
-              transform: sortAsc ? "rotate(90deg)" : "rotate(-90deg)",
-              transition: "transform .2s",
-            }}
-          />
-        </button>
-        {showFilters && (
-          <div
-            style={{
-              position: "absolute",
-              top: "100%",
-              right: 0,
-              marginTop: 6,
-              background: "var(--surface)",
-              border: "1px solid var(--line)",
-              borderRadius: 8,
-              padding: "14px 16px",
-              zIndex: 5,
-              minWidth: 220,
-              boxShadow: "0 8px 24px rgb(24 34 48 / 10%)",
-            }}
-          >
-            <p
-              style={{
-                margin: "0 0 8px",
-                fontSize: 10,
-                fontWeight: 700,
-                color: "var(--muted-ink)",
-                textTransform: "uppercase",
-                letterSpacing: ".07em",
-              }}
-            >
-              Trip
-            </p>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 4,
-                marginBottom: 12,
-              }}
-            >
-              {tripOptions.map((t) => (
-                <button
-                  key={t}
-                  className={tripFilter === t ? "filter active" : "filter"}
-                  style={{ fontSize: 10 }}
-                  onClick={() => setTripFilter(t)}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-            <p
-              style={{
-                margin: "0 0 8px",
-                fontSize: 10,
-                fontWeight: 700,
-                color: "var(--muted-ink)",
-                textTransform: "uppercase",
-                letterSpacing: ".07em",
-              }}
-            >
-              Status
-            </p>
-            <div style={{ display: "flex", gap: 4 }}>
-              {["All", "Open", "Done"].map((s) => (
-                <button
-                  key={s}
-                  className={statusFilter === s ? "filter active" : "filter"}
-                  style={{ fontSize: 10 }}
-                  onClick={() => setStatusFilter(s)}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
-      {filtered.map((fu) => (
-        <div
-          key={fu.id}
-          className="extra-row"
-          style={{ alignItems: "flex-start", gap: 12, padding: "14px 0" }}
-        >
-          <span className="extra-icon" style={{ marginTop: 2 }}>
-            <Clock size={15} />
-          </span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                flexWrap: "wrap",
-              }}
-            >
-              <b style={{ fontSize: 11 }}>{fu.driver}</b>
-              <button
-                className="text-button"
-                style={{ fontSize: 10, padding: 0 }}
-                onClick={() => onOpenTrip(fu.tripId)}
-              >
-                {fu.tripRef}{" "}
-                <CaretRight size={10} style={{ display: "inline" }} />
-              </button>
-              <span
-                className={`status ${fu.status.toLowerCase()}`}
-                style={{ fontSize: 9 }}
-              >
-                {fu.status}
-              </span>
-            </div>
-            <p
-              style={{
-                fontSize: 10,
-                color: "var(--muted-ink)",
-                margin: "4px 0 0",
-                lineHeight: 1.5,
-              }}
-            >
-              {fu.note}
-            </p>
-            <small
-              style={{
-                color: "#9ca6b4",
-                fontSize: 9,
-                display: "block",
-                marginTop: 4,
-              }}
-            >
-              Due {fu.dueDate} · {to12Hour(fu.dueTime)}
-            </small>
-          </div>
-          <a
-            href={`tel:${fu.driverPhone}`}
-            onClick={(e) => {
-              e.preventDefault();
-              onCall(fu);
-            }}
-            className="button secondary compact"
-            style={{ fontSize: 11, flexShrink: 0 }}
-            aria-label={`Call ${fu.driver}`}
-            title={`Call ${fu.driver}`}
-          >
-            <span style={{ fontSize: 14 }}>📞</span> Call
-          </a>
-        </div>
-      ))}
-      {!filtered.length && <Empty label="No follow-ups match" />}
-    </section>
+
+      {/* Section 3: Table column header & Section 4: Table rows */}
+      <div className="table-scroll-container">
+        <table className="table-ui">
+          <thead>
+            <tr>
+              {[
+                t("Driver Name"),
+                t("Trip Ref"),
+                t("Follow-up Note"),
+                t("Due Date & Time"),
+                t("Status"),
+                t("Action"),
+              ].map((h) => (
+                <th key={h}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((fu) => (
+              <tr key={fu.id}>
+                <td style={{ fontWeight: 600 }}>{fu.driver}</td>
+                <td>
+                  <button
+                    className="text-button"
+                    style={{ fontSize: 12, padding: 0 }}
+                    onClick={() => onOpenTrip(fu.tripId)}
+                  >
+                    {fu.tripRef}{" "}
+                    <CaretRight size={10} style={{ display: "inline" }} />
+                  </button>
+                </td>
+                <td style={{ color: "var(--muted-ink)" }}>{fu.note}</td>
+                <td style={{ color: "#64748b", whiteSpace: "nowrap" }}>
+                  Due {fu.dueDate} · {to12Hour(fu.dueTime)}
+                </td>
+                <td>
+                  <span className={`status ${fu.status.toLowerCase()}`}>
+                    {t(fu.status)}
+                  </span>
+                </td>
+                <td>
+                  <a
+                    href={`tel:${fu.driverPhone}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onCall(fu);
+                    }}
+                    className="button secondary compact"
+                    style={{ fontSize: 11 }}
+                    aria-label={`Call ${fu.driver}`}
+                    title={`Call ${fu.driver}`}
+                  >
+                    {t("Call")}
+                  </a>
+                </td>
+              </tr>
+            ))}
+            {!filtered.length && (
+              <tr>
+                <td
+                  colSpan={6}
+                  style={{
+                    padding: "2rem",
+                    textAlign: "center",
+                    color: "#94a3b8",
+                  }}
+                >
+                  No follow-ups match the filter.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
@@ -6512,6 +6660,7 @@ function FuelTransactionsPage({
   view?: string;
   defaultStatusFilter?: string;
 }) {
+  const { t } = useLang();
   const [statusFilter, setStatusFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -6576,450 +6725,161 @@ function FuelTransactionsPage({
   const activeFilters =
     (statusFilter !== "All" ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0);
   return (
-    <section className="panel list-panel" style={{ overflow: "hidden" }}>
-      <div className="panel-header" style={{ marginBottom: 12 }}>
-        <div>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--muted-ink)" }}>
-            Dispatch fuel authorisations to pump stations.
-          </p>
-        </div>
-      </div>
-      <div
-        className="filters"
-        style={{
-          alignItems: "center",
-          gap: 10,
-          flexWrap: "nowrap",
-          width: "100%",
-          marginBottom: 16,
-        }}
-      >
-        <div className="search" style={{ flex: 1, minWidth: 0 }}>
+    <div className="table-page-panel">
+      <FilterModal
+        isOpen={showFilters}
+        onClose={() => setShowFilters(false)}
+        title={t("Filters")}
+        sections={[
+          {
+            title: t("STATUS"),
+            options: ["All", "Pending", "Sent", "Resent"].map((id) => ({
+              id,
+              label: t(id),
+            })),
+            selected: statusFilter,
+            onSelect: (id) => setStatusFilter(id),
+          },
+        ]}
+        onClearAll={() => setStatusFilter("All")}
+      />
+
+      {/* Section 2: search bar + filter icon button */}
+      <div className="table-section-toolbar">
+        <div className="table-search-box">
           <MagnifyingGlass
             size={16}
-            style={{ color: "#9ca6b4", marginRight: 4, flexShrink: 0 }}
+            style={{ color: "#9ca6b4", flexShrink: 0 }}
           />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search trip, driver, station"
-            style={{ width: "100%", minWidth: 0 }}
+            placeholder={`${t("Search")} trip, driver, station...`}
           />
         </div>
-        <div style={{ position: "relative", flexShrink: 0 }}>
-          <button
-            className="icon-create"
-            aria-label="Open filters"
-            title="Filters"
-            onClick={() =>
-              showFilters ? setShowFilters(false) : openFilters()
-            }
-            style={{ width: 40, height: 40, minWidth: 40 }}
-          >
-            <FunnelSimple size={16} />
-            {activeFilters > 0 && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: -4,
-                  right: -4,
-                  background: "var(--blue)",
-                  color: "white",
-                  borderRadius: 999,
-                  minWidth: 16,
-                  height: 16,
-                  padding: "0 4px",
-                  fontSize: 9,
-                  display: "grid",
-                  placeItems: "center",
-                  fontWeight: 700,
-                }}
-              >
-                {activeFilters}
-              </span>
-            )}
-          </button>
-          {showFilters && (
-            <>
-              <div
-                role="presentation"
-                onClick={() => setShowFilters(false)}
-                style={{
-                  position: "fixed",
-                  inset: 0,
-                  background: "rgba(15, 23, 42, 0.2)",
-                  zIndex: 35,
-                }}
-              />
-              <div
-                role="dialog"
-                aria-label="Fuel transaction filters"
-                style={{
-                  position: "fixed",
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  zIndex: 40,
-                  background: "var(--surface, #fff)",
-                  borderTopLeftRadius: 24,
-                  borderTopRightRadius: 24,
-                  boxShadow: "0 -16px 40px rgba(15, 23, 42, 0.18)",
-                  maxHeight: "80vh",
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                <div
-                  style={{
-                    width: 42,
-                    height: 4,
-                    borderRadius: 999,
-                    background: "#dbe3ee",
-                    margin: "12px auto 4px",
-                    flexShrink: 0,
-                  }}
-                />
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "8px 20px 12px",
-                    borderBottom: "1px solid var(--line)",
-                    flexShrink: 0,
-                  }}
-                >
-                  <div>
-                    <b style={{ fontSize: 17, color: "var(--ink)" }}>
-                      Filter Transactions
-                    </b>
-                    {activeFilters > 0 && (
-                      <span
-                        style={{
-                          fontSize: 12,
-                          color: "var(--muted-ink)",
-                          marginLeft: 8,
-                        }}
-                      >
-                        ({activeFilters} active)
-                      </span>
-                    )}
-                  </div>
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 12 }}
-                  >
-                    <button
-                      type="button"
-                      className="text-button"
-                      style={{
-                        fontSize: 13,
-                        color: "var(--blue)",
-                        fontWeight: 600,
-                      }}
-                      onClick={clearAllFilters}
-                    >
-                      Reset All
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowFilters(false)}
-                      aria-label="Close filters"
-                      style={{
-                        background: "var(--line-light, #f1f5f9)",
-                        border: "none",
-                        borderRadius: "50%",
-                        width: 30,
-                        height: 30,
-                        display: "grid",
-                        placeItems: "center",
-                        cursor: "pointer",
-                        color: "var(--ink)",
-                      }}
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    padding: "16px 20px",
-                    overflowY: "auto",
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 20,
-                  }}
-                >
-                  <div>
-                    <p
-                      style={{
-                        margin: "0 0 10px",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: "var(--muted-ink)",
-                        textTransform: "uppercase",
-                        letterSpacing: ".08em",
-                      }}
-                    >
-                      Status
-                    </p>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: 8,
-                      }}
-                    >
-                      {["All", "Pending", "Sent", "Resent"].map((f) => {
-                        const isSelected = draftStatus === f;
-                        return (
-                          <button
-                            key={f}
-                            type="button"
-                            onClick={() => setDraftStatus(f)}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              padding: "10px 12px",
-                              borderRadius: 10,
-                              border: isSelected
-                                ? "1.5px solid var(--blue)"
-                                : "1px solid var(--line)",
-                              background: isSelected
-                                ? "var(--blue-soft, #eff6ff)"
-                                : "var(--surface)",
-                              color: isSelected ? "var(--blue)" : "var(--ink)",
-                              fontSize: 13,
-                              fontWeight: isSelected ? 600 : 500,
-                              cursor: "pointer",
-                              textAlign: "left",
-                            }}
-                          >
-                            <span>{f}</span>
-                            {isSelected && (
-                              <CheckCircle
-                                size={15}
-                                style={{ color: "var(--blue)", flexShrink: 0 }}
-                              />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p
-                      style={{
-                        margin: "0 0 10px",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: "var(--muted-ink)",
-                        textTransform: "uppercase",
-                        letterSpacing: ".08em",
-                      }}
-                    >
-                      Date Range
-                    </p>
-                    <DateRangeFilter
-                      dateFrom={draftDateFrom}
-                      dateTo={draftDateTo}
-                      onFrom={setDraftDateFrom}
-                      onTo={setDraftDateTo}
-                    />
-                  </div>
-                </div>
-
-                  <div
-                    style={{
-                      padding: "12px 20px calc(16px + env(safe-area-inset-bottom))",
-                      borderTop: "1px solid var(--line)",
-                      background: "var(--surface, #fff)",
-                      display: "flex",
-                      gap: 10,
-                      flexShrink: 0,
-                      position: "sticky",
-                      bottom: "72px",
-                      zIndex: 1,
-                    }}
-                  >
-                  <button
-                    className="button secondary"
-                    style={{
-                      flex: 1,
-                      padding: "12px",
-                      fontSize: 14,
-                      borderRadius: 10,
-                    }}
-                    onClick={clearAllFilters}
-                    type="button"
-                  >
-                    Clear All
-                  </button>
-                  <button
-                    className="button primary"
-                    style={{
-                      flex: 2,
-                      padding: "12px",
-                      fontSize: 14,
-                      borderRadius: 10,
-                      fontWeight: 700,
-                    }}
-                    onClick={applyFilters}
-                    type="button"
-                  >
-                    Apply Filters
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {filtered.map((tx) => (
-          <div
-            key={tx.id}
-            style={{
-              background: "var(--surface)",
-              border: "1px solid var(--line)",
-              borderRadius: 12,
-              padding: 14,
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-            }}
-          >
-            <div
+        <button
+          className="table-filter-btn"
+          onClick={() => setShowFilters(true)}
+          title={t("Filters")}
+          aria-label={t("Filters")}
+        >
+          <FunnelSimple size={16} />
+          {activeFilters > 0 && (
+            <span
               style={{
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "space-between",
-                gap: 10,
+                position: "absolute",
+                top: -4,
+                right: -4,
+                background: "#2563eb",
+                color: "#fff",
+                borderRadius: "50%",
+                width: 14,
+                height: 14,
+                fontSize: 9,
+                display: "grid",
+                placeItems: "center",
+                fontWeight: 700,
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  minWidth: 0,
-                  flex: 1,
-                }}
-              >
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 8,
-                    background: "var(--blue-soft)",
-                    display: "grid",
-                    placeItems: "center",
-                    flexShrink: 0,
-                    color: "var(--blue)",
-                  }}
-                >
-                  <GasPump size={18} />
-                </div>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div
-                    style={{
-                      fontWeight: 700,
-                      fontSize: 14,
-                      color: "var(--ink)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {tx.tripRef} · {tx.driver}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "var(--muted-ink)",
-                      marginTop: 2,
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {tx.station} · <b>{tx.litres}</b>
-                  </div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  textAlign: "right",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-end",
-                  gap: 4,
-                  flexShrink: 0,
-                }}
-              >
-                <span
-                  className="status"
-                  style={{
-                    background:
-                      tx.status === "Pending"
-                        ? "#fef3c7"
-                        : tx.status === "Sent"
-                          ? "#dbeafe"
-                          : "#d1fae5",
-                    color:
-                      tx.status === "Pending"
-                        ? "#d97706"
-                        : tx.status === "Sent"
-                          ? "#1d4ed8"
-                          : "#065f46",
-                    fontSize: 11,
-                    padding: "3px 8px",
-                    borderRadius: 6,
-                    fontWeight: 600,
-                  }}
-                >
-                  {tx.status}
-                </span>
-                <div
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 14,
-                    color: "var(--ink)",
-                  }}
-                >
-                  {tx.amount}
-                </div>
-              </div>
-            </div>
-
-            {tx.status === "Pending" && (
-              <button
-                className="button primary wide"
-                style={{ fontSize: 13, padding: "8px 16px", borderRadius: 8 }}
-                onClick={() => onSendToPump(tx)}
-              >
-                Send to pump
-              </button>
-            )}
-            {(tx.status === "Sent" || tx.status === "Resent") && (
-              <button
-                className="button secondary wide"
-                style={{ fontSize: 13, padding: "8px 16px", borderRadius: 8 }}
-                onClick={() => onResend(tx)}
-              >
-                Resend
-              </button>
-            )}
-          </div>
-        ))}
+              {activeFilters}
+            </span>
+          )}
+        </button>
       </div>
 
-      {!filtered.length && <Empty label="No fuel transactions found" />}
-    </section>
+      {/* Section 3: Table column header & Section 4: Table rows */}
+      <div className="table-scroll-container">
+        <table className="table-ui">
+          <thead>
+            <tr>
+              {[
+                t("Trip Ref"),
+                t("Driver"),
+                t("Pump Station"),
+                t("Litres"),
+                t("Amount"),
+                t("Status"),
+                t("Action"),
+              ].map((h) => (
+                <th key={h}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((tx) => (
+              <tr key={tx.id}>
+                <td style={{ fontFamily: "monospace", fontWeight: 700 }}>
+                  {tx.tripRef}
+                </td>
+                <td style={{ fontWeight: 500 }}>{tx.driver}</td>
+                <td style={{ color: "#475569" }}>{tx.station}</td>
+                <td style={{ color: "#475569" }}>{tx.litres}</td>
+                <td style={{ fontWeight: 600 }}>{tx.amount}</td>
+                <td>
+                  <span
+                    className="status"
+                    style={{
+                      background:
+                        tx.status === "Pending"
+                          ? "#fef3c7"
+                          : tx.status === "Sent"
+                            ? "#dbeafe"
+                            : "#d1fae5",
+                      color:
+                        tx.status === "Pending"
+                          ? "#d97706"
+                          : tx.status === "Sent"
+                            ? "#1d4ed8"
+                            : "#065f46",
+                      fontSize: 11,
+                      padding: "3px 8px",
+                      borderRadius: 6,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {t(tx.status)}
+                  </span>
+                </td>
+                <td>
+                  {tx.status === "Pending" && (
+                    <button
+                      className="button primary compact"
+                      style={{ fontSize: 11, padding: "4px 10px" }}
+                      onClick={() => onSendToPump(tx)}
+                    >
+                      {t("Send to pump")}
+                    </button>
+                  )}
+                  {(tx.status === "Sent" || tx.status === "Resent") && (
+                    <button
+                      className="button secondary compact"
+                      style={{ fontSize: 11, padding: "4px 10px" }}
+                      onClick={() => onResend(tx)}
+                    >
+                      {t("Resend")}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {!filtered.length && (
+              <tr>
+                <td
+                  colSpan={7}
+                  style={{
+                    padding: "2rem",
+                    textAlign: "center",
+                    color: "#94a3b8",
+                  }}
+                >
+                  No fuel transactions match the filters.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
