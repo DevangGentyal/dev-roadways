@@ -202,20 +202,20 @@ const ROLE_GREETINGS: Record<Role, string> = {
 
 const STATUS_LABELS: Record<TripStatus | string, string> = {
   NEW: "New",
-  DRIVER_PENDING: "Driver pending",
+  DRIVER_PENDING: "Driver Pending",
   REJECTED: "Rejected (Ops)",
   DRIVER_ACCEPTED: "Accepted",
   DRIVER_REJECTED: "Rejected (Driver)",
-  DOCUMENTS_SUBMITTED: "docs uploaded",
+  DOCUMENTS_SUBMITTED: "Docs Uploaded",
   STAMPED_DOCS_SUBMITTED: "Stamped Docs",
-  READY: "not started",
-  IN_TRANSIT: "in transit",
-  REACHED: "reached",
-  COMPLETED: "complete",
+  READY: "Not Started",
+  IN_TRANSIT: "In Transit",
+  REACHED: "Reached",
+  COMPLETED: "Complete",
   // Legacy fallbacks
-  PREPARING: "docs uploaded",
-  ON_HOLD: "in transit",
-  DELIVERED: "reached",
+  PREPARING: "Docs Uploaded",
+  ON_HOLD: "In Transit",
+  DELIVERED: "Reached",
 };
 
 const STATUS_COLORS: Record<TripStatus | string, { bg: string; color: string }> = {
@@ -1539,7 +1539,7 @@ function Dashboard({
           tone="blue"
           hint="Assigned · Pre-trip"
           icon={<Truck size={18} />}
-          onClick={() => onMetricClick("Driver pending")}
+          onClick={() => onMetricClick("Driver Pending")}
         />
         <Stat
           label="Active Trips"
@@ -1547,7 +1547,7 @@ function Dashboard({
           tone="purple"
           hint="Currently in transit"
           icon={<Truck size={18} />}
-          onClick={() => onMetricClick("in transit")}
+          onClick={() => onMetricClick("In Transit")}
         />
         <Stat
           label="Docs Uploaded"
@@ -1555,7 +1555,7 @@ function Dashboard({
           tone="green"
           hint="Awaiting verification"
           icon={<ChartPie size={18} />}
-          onClick={() => onMetricClick("docs uploaded")}
+          onClick={() => onMetricClick("Docs Uploaded")}
         />
         <Stat
           label="Completed"
@@ -1563,7 +1563,7 @@ function Dashboard({
           tone="green"
           hint="Finalized"
           icon={<ChartPie size={18} />}
-          onClick={() => onMetricClick("complete")}
+          onClick={() => onMetricClick("Complete")}
         />
         {role !== "Driver" && (
           <Stat
@@ -1805,16 +1805,16 @@ function TripList({
   const FILTER_GROUPS: Record<string, TripStatus[]> = {
     All: [],
     New: ["NEW"],
-    "Driver pending": ["DRIVER_PENDING"],
+    "Driver Pending": ["DRIVER_PENDING"],
     "Rejected (Ops)": ["REJECTED"],
     Accepted: ["DRIVER_ACCEPTED"],
     "Rejected (Driver)": ["DRIVER_REJECTED"],
-    "docs uploaded": ["DOCUMENTS_SUBMITTED", "PREPARING"],
-    "not started": ["READY"],
-    "in transit": ["IN_TRANSIT", "ON_HOLD"],
-    reached: ["REACHED", "DELIVERED"],
+    "Docs Uploaded": ["DOCUMENTS_SUBMITTED", "PREPARING"],
+    "Not Started": ["READY"],
+    "In Transit": ["IN_TRANSIT", "ON_HOLD"],
+    Reached: ["REACHED", "DELIVERED"],
     "Stamped Docs": ["STAMPED_DOCS_SUBMITTED"],
-    complete: ["COMPLETED"],
+    Complete: ["COMPLETED"],
   };
 
   const filtered = trips.filter((t) => {
@@ -1848,16 +1848,16 @@ function TripList({
   const statusOptions = [
     "All",
     "New",
-    "Driver pending",
+    "Driver Pending",
     "Rejected (Ops)",
     "Accepted",
     "Rejected (Driver)",
-    "docs uploaded",
-    "not started",
-    "in transit",
-    "reached",
+    "Docs Uploaded",
+    "Not Started",
+    "In Transit",
+    "Reached",
     "Stamped Docs",
-    "complete",
+    "Complete",
   ];
 
   function openFilters() {
@@ -4262,7 +4262,7 @@ function TripOpsReport({
           tone="blue"
           hint="Assigned · Pre-trip"
           icon={<Truck size={18} />}
-          onClick={() => onMetricClick("Driver pending")}
+          onClick={() => onMetricClick("Driver Pending")}
         />
         <Stat
           label="Active"
@@ -4270,7 +4270,7 @@ function TripOpsReport({
           tone="purple"
           hint="Currently in transit"
           icon={<Truck size={18} />}
-          onClick={() => onMetricClick("in transit")}
+          onClick={() => onMetricClick("In Transit")}
         />
         <Stat
           label="Docs Uploaded"
@@ -4278,7 +4278,7 @@ function TripOpsReport({
           tone="green"
           hint="Docs pending/submitted"
           icon={<ChartPie size={18} />}
-          onClick={() => onMetricClick("docs uploaded")}
+          onClick={() => onMetricClick("Docs Uploaded")}
         />
         <Stat
           label="Completed"
@@ -4286,7 +4286,7 @@ function TripOpsReport({
           tone="green"
           hint="Finalized"
           icon={<ChartPie size={18} />}
-          onClick={() => onMetricClick("complete")}
+          onClick={() => onMetricClick("Complete")}
         />
         <Stat
           label="Rejected"
