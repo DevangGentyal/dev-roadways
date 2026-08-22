@@ -60,6 +60,7 @@ type TripStatus =
   | "REACHED"
   | "DELIVERED"
   | "DOCUMENTS_SUBMITTED"
+  | "STAMPED_DOCS_SUBMITTED"
   | "COMPLETED";
 
 type Trip = {
@@ -199,36 +200,40 @@ const ROLE_GREETINGS: Record<Role, string> = {
 
 // ─── Status Helpers ───────────────────────────────────────────────────────────
 
-const STATUS_LABELS: Record<TripStatus, string> = {
+const STATUS_LABELS: Record<TripStatus | string, string> = {
   NEW: "New",
   DRIVER_PENDING: "Driver Pending",
-  DRIVER_ACCEPTED: "Driver Accepted",
-  DRIVER_REJECTED: "Driver Rejected",
-  REJECTED: "Rejected",
-  PREPARING: "Preparing",
-  READY: "Ready",
+  REJECTED: "Rejected (Ops)",
+  DRIVER_ACCEPTED: "Accepted",
+  DRIVER_REJECTED: "Rejected (Driver)",
+  DOCUMENTS_SUBMITTED: "Docs Uploaded",
+  STAMPED_DOCS_SUBMITTED: "Stamped Docs",
+  READY: "Not Started",
   IN_TRANSIT: "In Transit",
-  ON_HOLD: "On Hold",
   REACHED: "Reached",
-  DELIVERED: "Delivered",
-  DOCUMENTS_SUBMITTED: "Docs Submitted",
-  COMPLETED: "Completed",
+  COMPLETED: "Complete",
+  // Legacy fallbacks
+  PREPARING: "Docs Uploaded",
+  ON_HOLD: "In Transit",
+  DELIVERED: "Reached",
 };
 
-const STATUS_COLORS: Record<TripStatus, { bg: string; color: string }> = {
+const STATUS_COLORS: Record<TripStatus | string, { bg: string; color: string }> = {
   NEW: { bg: "#fef3c7", color: "#d97706" },
   DRIVER_PENDING: { bg: "#e0f2fe", color: "#0369a1" },
+  REJECTED: { bg: "#fee2e2", color: "#b91c1c" },
   DRIVER_ACCEPTED: { bg: "#dbeafe", color: "#1d4ed8" },
-  DRIVER_REJECTED: { bg: "#fee2e2", color: "#dc2626" },
-  REJECTED: { bg: "#fee2e2", color: "#dc2626" },
-  PREPARING: { bg: "#ede9fe", color: "#6d28d9" },
-  READY: { bg: "#dbeafe", color: "#1d4ed8" },
-  IN_TRANSIT: { bg: "#ede9fe", color: "#5b21b6" },
-  ON_HOLD: { bg: "#fef3c7", color: "#b45309" },
-  REACHED: { bg: "#dcfce7", color: "#166534" },
-  DELIVERED: { bg: "#bbf7d0", color: "#15803d" },
+  DRIVER_REJECTED: { bg: "#fee2e2", color: "#b91c1c" },
   DOCUMENTS_SUBMITTED: { bg: "#e0f2fe", color: "#0369a1" },
+  STAMPED_DOCS_SUBMITTED: { bg: "#e0f2fe", color: "#0369a1" },
+  READY: { bg: "#e0e7ff", color: "#4338ca" },
+  IN_TRANSIT: { bg: "#ede9fe", color: "#6d28d9" },
+  REACHED: { bg: "#fef3c7", color: "#b45309" },
   COMPLETED: { bg: "#dcfce7", color: "#15803d" },
+  // Legacy fallbacks
+  PREPARING: { bg: "#e0f2fe", color: "#0369a1" },
+  ON_HOLD: { bg: "#ede9fe", color: "#6d28d9" },
+  DELIVERED: { bg: "#fef3c7", color: "#b45309" },
 };
 
 function getStatusLabel(s: string): string {
@@ -369,10 +374,19 @@ export default function OpsDashboard() {
   const [view, setView] = useState("dashboard");
 
   const changeView = (targetView: string) => {
+    if (role === "Coordinator" && targetView === "fuel") {
+      return;
+    }
     setTripsFilter("All");
     setFollowupTripFilter("");
     setView(targetView);
   };
+
+  useEffect(() => {
+    if (role === "Coordinator" && view === "fuel") {
+      setView("dashboard");
+    }
+  }, [role, view]);
   const [selected, setSelected] = useState<Trip | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -696,14 +710,28 @@ export default function OpsDashboard() {
     };
     const result = await persist("documents", [entity]);
     const hydratedTrip = result && "trip" in result ? (result.trip as Trip | undefined) : undefined;
+    const initTypes = ["LR", "WB", "Invoice"];
+    const stampedTypes = ["LR (stamped)", "WB (stamped)", "Invoice (stamped)"];
     const next = trips.map((t) => {
       if (t.id !== tripId) return t;
-      const updatedDocs = hydratedTrip?.documents || [...t.documents, data];
-      return { ...t, documents: updatedDocs };
+      const updatedDocs = hydratedTrip?.documents || (t.documents.some((d) => d.id === data.id) ? t.documents : [...t.documents, data]);
+      const hasAllInitDocs = initTypes.every((type) => updatedDocs.some((d) => d.type === type));
+      const allInitVerified = initTypes.every((type) => updatedDocs.some((d) => d.type === type && d.status === "verified"));
+      const hasAllStampedDocs = stampedTypes.every((type) => updatedDocs.some((d) => d.type === type));
+      let newStatus = t.status;
+      if (hasAllStampedDocs) {
+        newStatus = "STAMPED_DOCS_SUBMITTED" as TripStatus;
+      } else if (hasAllInitDocs && !allInitVerified && ["DRIVER_ACCEPTED", "DRIVER_PENDING", "PREPARING", "NEW"].includes(t.status)) {
+        newStatus = "DOCUMENTS_SUBMITTED" as TripStatus;
+      } else if (allInitVerified && ["DRIVER_ACCEPTED", "DRIVER_PENDING", "PREPARING", "DOCUMENTS_SUBMITTED"].includes(t.status)) {
+        newStatus = "READY" as TripStatus;
+      }
+      return { ...t, documents: updatedDocs, status: newStatus };
     });
     setTrips(next);
     setSelected(next.find((t) => t.id === tripId) || selected);
     setShowDocument(false);
+    void persist("trips", next);
     notify(`${data.type} document uploaded`);
   }
 
@@ -716,15 +744,29 @@ export default function OpsDashboard() {
     };
     const result = await persist("documents", [entity]);
     const hydratedTrip = result && "trip" in result ? (result.trip as Trip | undefined) : undefined;
+    const initTypes = ["LR", "WB", "Invoice"];
+    const stampedTypes = ["LR (stamped)", "WB (stamped)", "Invoice (stamped)"];
     const next = trips.map((t) => {
       if (t.id !== tripId) return t;
-      const updatedDocs = hydratedTrip?.documents || [...t.documents, data];
-      return { ...t, documents: updatedDocs };
+      const updatedDocs = hydratedTrip?.documents || (t.documents.some((d) => d.id === data.id) ? t.documents : [...t.documents, data]);
+      const hasAllInitDocs = initTypes.every((type) => updatedDocs.some((d) => d.type === type));
+      const allInitVerified = initTypes.every((type) => updatedDocs.some((d) => d.type === type && d.status === "verified"));
+      const hasAllStampedDocs = stampedTypes.every((type) => updatedDocs.some((d) => d.type === type));
+      let newStatus = t.status;
+      if (hasAllStampedDocs) {
+        newStatus = "STAMPED_DOCS_SUBMITTED" as TripStatus;
+      } else if (hasAllInitDocs && !allInitVerified && ["DRIVER_ACCEPTED", "DRIVER_PENDING", "PREPARING", "NEW"].includes(t.status)) {
+        newStatus = "DOCUMENTS_SUBMITTED" as TripStatus;
+      } else if (allInitVerified && ["DRIVER_ACCEPTED", "DRIVER_PENDING", "PREPARING", "DOCUMENTS_SUBMITTED"].includes(t.status)) {
+        newStatus = "READY" as TripStatus;
+      }
+      return { ...t, documents: updatedDocs, status: newStatus };
     });
     setTrips(next);
     if (selected?.id === tripId) {
       setSelected(next.find((t) => t.id === tripId) || selected);
     }
+    void persist("trips", next);
   }
 
   async function submitStampedDocsForTrip(
@@ -746,15 +788,20 @@ export default function OpsDashboard() {
       return {
         ...t,
         documents: hydratedTrip?.documents || [...t.documents, ...newDocs],
-        status: "DOCUMENTS_SUBMITTED" as TripStatus,
+        status: "STAMPED_DOCS_SUBMITTED" as TripStatus,
       };
     });
     setTrips(next);
+    const updatedSelectedTrip = next.find((t) => t.id === tripId);
+    if (selected?.id === tripId && updatedSelectedTrip) {
+      setSelected(updatedSelectedTrip);
+    }
     void persist("trips", next);
     notify("Stamped documents submitted — waiting for Operations approval");
   }
 
   async function toggleVerifyDoc(tripId: string, docId: string) {
+    const initTypes = ["LR", "WB", "Invoice"];
     const stampedTypes = ["LR (stamped)", "WB (stamped)", "Invoice (stamped)"];
 
     const nextTrips = trips.map((t) => {
@@ -765,15 +812,24 @@ export default function OpsDashboard() {
         return { ...d, status: newStatus };
       });
 
+      const allInitVerified = initTypes.every((type) =>
+        updatedDocs.some((d) => d.type === type && d.status === "verified"),
+      );
+
       const allStampedVerified = stampedTypes.every((type) =>
         updatedDocs.some((d) => d.type === type && d.status === "verified"),
       );
 
-      const newTripStatus = allStampedVerified
-        ? ("COMPLETED" as TripStatus)
-        : t.status === "COMPLETED"
-          ? ("DOCUMENTS_SUBMITTED" as TripStatus)
-          : t.status;
+      let newTripStatus = t.status;
+      if (allStampedVerified) {
+        newTripStatus = "COMPLETED" as TripStatus;
+      } else if (allInitVerified && ["DOCUMENTS_SUBMITTED", "DRIVER_ACCEPTED", "PREPARING"].includes(t.status)) {
+        newTripStatus = "READY" as TripStatus;
+      } else if (!allInitVerified && t.status === "READY") {
+        newTripStatus = "DOCUMENTS_SUBMITTED" as TripStatus;
+      } else if (!allStampedVerified && t.status === "COMPLETED") {
+        newTripStatus = "STAMPED_DOCS_SUBMITTED" as TripStatus;
+      }
 
       return { ...t, documents: updatedDocs, status: newTripStatus };
     });
@@ -882,7 +938,7 @@ export default function OpsDashboard() {
                   icon={<Clock size={18} />}
                 />
               )}
-              {role !== "Driver" && (
+              {role !== "Driver" && role !== "Coordinator" && (
                 <NavItem
                   active={view === "fuel"}
                   label="Fuel transactions"
@@ -1121,7 +1177,7 @@ export default function OpsDashboard() {
                   view={view}
                 />
               )}
-              {view === "fuel" && role !== "Driver" && (
+              {view === "fuel" && role !== "Driver" && role !== "Coordinator" && (
                 <FuelTransactionsPage
                   transactions={fuelTransactions}
                   onSendToPump={sendToPump}
@@ -1244,7 +1300,7 @@ export default function OpsDashboard() {
                       icon={<Clock size={18} />}
                     />
                   )}
-                  {role !== "Driver" && (
+                  {role !== "Driver" && role !== "Coordinator" && (
                     <NavItem
                       active={view === "fuel"}
                       label="Fuel transactions"
@@ -1431,12 +1487,12 @@ function Dashboard({
 }) {
   const newTrips = trips.filter((t) => t.status === "NEW");
   const pendingTrips = trips.filter((t) =>
-    ["DRIVER_PENDING", "DRIVER_ACCEPTED", "PREPARING", "READY"].includes(
+    ["DRIVER_PENDING", "DRIVER_ACCEPTED", "PREPARING"].includes(
       t.status,
     ),
   );
   const activeTrips = trips.filter((t) =>
-    ["IN_TRANSIT", "ON_HOLD", "REACHED"].includes(t.status),
+    ["READY", "IN_TRANSIT", "ON_HOLD", "REACHED"].includes(t.status),
   );
   const deliveredTrips = trips.filter((t) =>
     ["DELIVERED", "DOCUMENTS_SUBMITTED"].includes(t.status),
@@ -1478,12 +1534,12 @@ function Dashboard({
           />
         )}
         <Stat
-          label="Pending Start"
+          label="Driver Pending"
           value={pendingTrips.length}
           tone="blue"
           hint="Assigned · Pre-trip"
           icon={<Truck size={18} />}
-          onClick={() => onMetricClick("Pending")}
+          onClick={() => onMetricClick("Driver Pending")}
         />
         <Stat
           label="Active Trips"
@@ -1491,15 +1547,15 @@ function Dashboard({
           tone="purple"
           hint="Currently in transit"
           icon={<Truck size={18} />}
-          onClick={() => onMetricClick("Active")}
+          onClick={() => onMetricClick("In Transit")}
         />
         <Stat
-          label="Delivered"
+          label="Docs Uploaded"
           value={deliveredTrips.length}
           tone="green"
-          hint="Awaiting docs/verify"
+          hint="Awaiting verification"
           icon={<ChartPie size={18} />}
-          onClick={() => onMetricClick("Delivered")}
+          onClick={() => onMetricClick("Docs Uploaded")}
         />
         <Stat
           label="Completed"
@@ -1507,7 +1563,7 @@ function Dashboard({
           tone="green"
           hint="Finalized"
           icon={<ChartPie size={18} />}
-          onClick={() => onMetricClick("Completed")}
+          onClick={() => onMetricClick("Complete")}
         />
         {role !== "Driver" && (
           <Stat
@@ -1516,7 +1572,7 @@ function Dashboard({
             tone="red"
             hint="Ops / Driver rejected"
             icon={<Clock size={18} />}
-            onClick={() => onMetricClick("Rejected")}
+            onClick={() => onMetricClick("Rejected (Ops)")}
           />
         )}
       </section>
@@ -1620,38 +1676,47 @@ function DateRangeFilter({
   onTo: (v: string) => void;
 }) {
   return (
-    <div className="date-range-filter" style={{ gap: 10 }}>
-      <label className="date-range-label" style={{ minWidth: 120 }}>
-        <span>From</span>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, width: "100%" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--muted-ink)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          From Date
+        </span>
         <input
           type="date"
           value={dateFrom}
           onChange={(e) => onFrom(e.target.value)}
-          className="date-range-input"
+          style={{
+            width: "100%",
+            padding: "8px 10px",
+            borderRadius: 8,
+            border: "1px solid var(--line)",
+            background: "var(--surface)",
+            color: "var(--ink)",
+            fontSize: 13,
+            outline: "none",
+          }}
         />
-      </label>
-      <label className="date-range-label" style={{ minWidth: 120 }}>
-        <span>To</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--muted-ink)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          To Date
+        </span>
         <input
           type="date"
           value={dateTo}
           onChange={(e) => onTo(e.target.value)}
-          className="date-range-input"
-        />
-      </label>
-      {(dateFrom || dateTo) && (
-        <button
-          className="filter"
-          style={{ padding: "4px 10px", fontSize: 11 }}
-          onClick={() => {
-            onFrom("");
-            onTo("");
+          style={{
+            width: "100%",
+            padding: "8px 10px",
+            borderRadius: 8,
+            border: "1px solid var(--line)",
+            background: "var(--surface)",
+            color: "var(--ink)",
+            fontSize: 13,
+            outline: "none",
           }}
-          aria-label="Clear date filter"
-        >
-          ✕ Clear
-        </button>
-      )}
+        />
+      </div>
     </div>
   );
 }
@@ -1721,36 +1786,35 @@ function TripList({
     setShowFilters(false);
   }, [view]);
   const statusPriority: Record<string, number> = {
-    NEW: 0,
-    DRIVER_PENDING: 1,
-    DRIVER_ACCEPTED: 2,
-    PREPARING: 3,
-    READY: 4,
-    IN_TRANSIT: 5,
-    ON_HOLD: 6,
-    REACHED: 7,
-    DELIVERED: 8,
-    DOCUMENTS_SUBMITTED: 9,
+    NEW: 1,
+    DRIVER_PENDING: 2,
+    REJECTED: 3,
+    DRIVER_ACCEPTED: 4,
+    DRIVER_REJECTED: 5,
+    DOCUMENTS_SUBMITTED: 6,
+    STAMPED_DOCS_SUBMITTED: 6,
+    PREPARING: 6,
+    READY: 7,
+    IN_TRANSIT: 8,
+    ON_HOLD: 8,
+    REACHED: 9,
+    DELIVERED: 9,
     COMPLETED: 10,
-    REJECTED: 11,
-    DRIVER_REJECTED: 12,
   };
 
   const FILTER_GROUPS: Record<string, TripStatus[]> = {
     All: [],
     New: ["NEW"],
-    "Waiting for Driver": ["DRIVER_PENDING"],
-    "Driver Accepted": ["DRIVER_ACCEPTED"],
-    Preparing: ["PREPARING"],
-    "Ready to Start": ["READY"],
-    "In Transit": ["IN_TRANSIT"],
-    "On Hold": ["ON_HOLD"],
-    Reached: ["REACHED"],
-    Delivered: ["DELIVERED"],
-    "Documents Submitted": ["DOCUMENTS_SUBMITTED"],
-    Completed: ["COMPLETED"],
-    Rejected: ["REJECTED", "DRIVER_REJECTED"],
-    "Driver Rejected": ["DRIVER_REJECTED"],
+    "Driver Pending": ["DRIVER_PENDING"],
+    "Rejected (Ops)": ["REJECTED"],
+    Accepted: ["DRIVER_ACCEPTED"],
+    "Rejected (Driver)": ["DRIVER_REJECTED"],
+    "Docs Uploaded": ["DOCUMENTS_SUBMITTED", "PREPARING"],
+    "Not Started": ["READY"],
+    "In Transit": ["IN_TRANSIT", "ON_HOLD"],
+    Reached: ["REACHED", "DELIVERED"],
+    "Stamped Docs": ["STAMPED_DOCS_SUBMITTED"],
+    Complete: ["COMPLETED"],
   };
 
   const filtered = trips.filter((t) => {
@@ -1784,18 +1848,16 @@ function TripList({
   const statusOptions = [
     "All",
     "New",
-    "Waiting for Driver",
-    "Driver Accepted",
-    "Preparing",
-    "Ready to Start",
+    "Driver Pending",
+    "Rejected (Ops)",
+    "Accepted",
+    "Rejected (Driver)",
+    "Docs Uploaded",
+    "Not Started",
     "In Transit",
-    "On Hold",
     "Reached",
-    "Delivered",
-    "Documents Submitted",
-    "Completed",
-    "Rejected",
-    "Driver Rejected",
+    "Stamped Docs",
+    "Complete",
   ];
 
   function openFilters() {
@@ -1924,13 +1986,13 @@ function TripList({
                     right: 0,
                     bottom: 0,
                     zIndex: 40,
-                    background: "#fff",
-                    borderTopLeftRadius: 20,
-                    borderTopRightRadius: 20,
-                    boxShadow: "0 -16px 40px rgba(15, 23, 42, 0.14)",
-                    padding: "12px 16px 16px",
-                    maxHeight: "72vh",
-                    overflow: "auto",
+                    background: "var(--surface, #fff)",
+                    borderTopLeftRadius: 24,
+                    borderTopRightRadius: 24,
+                    boxShadow: "0 -16px 40px rgba(15, 23, 42, 0.18)",
+                    maxHeight: "85vh",
+                    display: "flex",
+                    flexDirection: "column",
                   }}
                 >
                   <div
@@ -1939,7 +2001,8 @@ function TripList({
                       height: 4,
                       borderRadius: 999,
                       background: "#dbe3ee",
-                      margin: "0 auto 12px",
+                      margin: "12px auto 4px",
+                      flexShrink: 0,
                     }}
                   />
                   <div
@@ -1947,133 +2010,185 @@ function TripList({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      marginBottom: 12,
+                      padding: "8px 20px 12px",
+                      borderBottom: "1px solid var(--line)",
+                      flexShrink: 0,
                     }}
                   >
-                    <b style={{ fontSize: 15 }}>Filters</b>
-                    <button
-                      className="text-button"
-                      style={{ fontSize: 12, padding: 0 }}
-                      onClick={clearAllFilters}
-                    >
-                      Clear All
-                    </button>
-                  </div>
-                  {activeChips.length > 0 && (
-                    <div
-                      style={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: 8,
-                        marginBottom: 14,
-                      }}
-                    >
-                      {activeChips.map((chip) => (
-                        <button
-                          key={chip}
-                          className="filter active"
-                          style={{ fontSize: 11, paddingRight: 10 }}
-                          onClick={() => {
-                            if (chip === statusFilter) setStatusFilter("All");
-                            if (chip.startsWith("From ")) setDateFrom("");
-                            if (chip.startsWith("To ")) setDateTo("");
-                          }}
-                        >
-                          {chip} <span style={{ marginLeft: 6 }}>×</span>
-                        </button>
-                      ))}
+                    <div>
+                      <b style={{ fontSize: 17, color: "var(--ink)" }}>Filters</b>
+                      {activeFilters > 0 && (
+                        <span style={{ fontSize: 12, color: "var(--muted-ink)", marginLeft: 8 }}>
+                          ({activeFilters} active)
+                        </span>
+                      )}
                     </div>
-                  )}
-                  <div style={{ marginBottom: 14 }}>
-                    <p
-                      style={{
-                        margin: "0 0 8px",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: "var(--muted-ink)",
-                        textTransform: "uppercase",
-                        letterSpacing: ".08em",
-                      }}
-                    >
-                      Trip Status
-                    </p>
-                    <div style={{ display: "grid", gap: 8 }}>
-                      {statusOptions.map((f) => (
-                        <button
-                          key={f}
-                          className={
-                            draftStatus === f ? "filter active" : "filter"
-                          }
-                          style={{
-                            width: "100%",
-                            justifyContent: "space-between",
-                            padding: "12px 14px",
-                            fontSize: 13,
-                          }}
-                          onClick={() => setDraftStatus(f)}
-                        >
-                          <span>{f}</span>
-                          {draftStatus === f && <span>✓</span>}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p
-                      style={{
-                        margin: "0 0 8px",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: "var(--muted-ink)",
-                        textTransform: "uppercase",
-                        letterSpacing: ".08em",
-                      }}
-                    >
-                      Date Range
-                    </p>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: 10,
-                      }}
-                    >
-                      <label
-                        className="date-range-label"
-                        style={{ minWidth: 0 }}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <button
+                        type="button"
+                        className="text-button"
+                        style={{ fontSize: 13, color: "var(--blue)", fontWeight: 600 }}
+                        onClick={clearAllFilters}
                       >
-                        <span>From</span>
-                        <input
-                          type="date"
-                          value={draftDateFrom}
-                          onChange={(e) => setDraftDateFrom(e.target.value)}
-                          className="date-range-input"
-                        />
-                      </label>
-                      <label
-                        className="date-range-label"
-                        style={{ minWidth: 0 }}
+                        Reset All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowFilters(false)}
+                        aria-label="Close filters"
+                        style={{
+                          background: "var(--line-light, #f1f5f9)",
+                          border: "none",
+                          borderRadius: "50%",
+                          width: 30,
+                          height: 30,
+                          display: "grid",
+                          placeItems: "center",
+                          cursor: "pointer",
+                          color: "var(--ink)",
+                        }}
                       >
-                        <span>To</span>
-                        <input
-                          type="date"
-                          value={draftDateTo}
-                          onChange={(e) => setDraftDateTo(e.target.value)}
-                          className="date-range-input"
-                        />
-                      </label>
+                        <X size={16} />
+                      </button>
                     </div>
                   </div>
+
                   <div
                     style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
+                      padding: "16px 20px",
+                      overflowY: "auto",
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 20,
+                    }}
+                  >
+                    {activeChips.length > 0 && (
+                      <div>
+                        <p
+                          style={{
+                            margin: "0 0 8px",
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "var(--muted-ink)",
+                            textTransform: "uppercase",
+                            letterSpacing: ".08em",
+                          }}
+                        >
+                          Active Filters
+                        </p>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {activeChips.map((chip) => (
+                            <button
+                              key={chip}
+                              type="button"
+                              className="filter active"
+                              style={{ fontSize: 11, paddingRight: 10, borderRadius: 20 }}
+                              onClick={() => {
+                                if (chip === draftStatus) setDraftStatus("All");
+                                if (chip.startsWith("From ")) setDraftDateFrom("");
+                                if (chip.startsWith("To ")) setDraftDateTo("");
+                              }}
+                            >
+                              {chip} <span style={{ marginLeft: 6 }}>×</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <p
+                        style={{
+                          margin: "0 0 10px",
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: "var(--muted-ink)",
+                          textTransform: "uppercase",
+                          letterSpacing: ".08em",
+                        }}
+                      >
+                        Trip Status
+                      </p>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
+                          gap: 8,
+                        }}
+                      >
+                        {statusOptions.map((f) => {
+                          const isSelected = draftStatus === f;
+                          return (
+                            <button
+                              key={f}
+                              type="button"
+                              onClick={() => setDraftStatus(f)}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "10px 12px",
+                                borderRadius: 10,
+                                border: isSelected
+                                  ? "1.5px solid var(--blue)"
+                                  : "1px solid var(--line)",
+                                background: isSelected
+                                  ? "var(--blue-soft, #eff6ff)"
+                                  : "var(--surface)",
+                                color: isSelected ? "var(--blue)" : "var(--ink)",
+                                fontSize: 13,
+                                fontWeight: isSelected ? 600 : 500,
+                                cursor: "pointer",
+                                transition: "all 0.15s ease",
+                                textAlign: "left",
+                              }}
+                            >
+                              <span>{f}</span>
+                              {isSelected && (
+                                <CheckCircle size={15} style={{ color: "var(--blue)", flexShrink: 0 }} />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p
+                        style={{
+                          margin: "0 0 10px",
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: "var(--muted-ink)",
+                          textTransform: "uppercase",
+                          letterSpacing: ".08em",
+                        }}
+                      >
+                        Date Range
+                      </p>
+                      <DateRangeFilter
+                        dateFrom={draftDateFrom}
+                        dateTo={draftDateTo}
+                        onFrom={setDraftDateFrom}
+                        onTo={setDraftDateTo}
+                      />
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: "12px 20px 16px",
+                      borderTop: "1px solid var(--line)",
+                      background: "var(--surface, #fff)",
+                      display: "flex",
                       gap: 10,
-                      marginTop: 16,
+                      flexShrink: 0,
                     }}
                   >
                     <button
                       className="button secondary"
+                      style={{ flex: 1, padding: "12px", fontSize: 14, borderRadius: 10 }}
                       onClick={clearAllFilters}
                       type="button"
                     >
@@ -2081,6 +2196,7 @@ function TripList({
                     </button>
                     <button
                       className="button primary"
+                      style={{ flex: 2, padding: "12px", fontSize: 14, borderRadius: 10, fontWeight: 700 }}
                       onClick={applyFilters}
                       type="button"
                     >
@@ -4100,12 +4216,12 @@ function TripOpsReport({
   const total = trips.length;
   const newTrips = trips.filter((t) => t.status === "NEW").length;
   const pending = trips.filter((t) =>
-    ["DRIVER_PENDING", "DRIVER_ACCEPTED", "PREPARING", "READY"].includes(
+    ["DRIVER_PENDING", "DRIVER_ACCEPTED", "PREPARING"].includes(
       t.status,
     ),
   ).length;
   const active = trips.filter((t) =>
-    ["IN_TRANSIT", "ON_HOLD", "REACHED"].includes(t.status),
+    ["READY", "IN_TRANSIT", "ON_HOLD", "REACHED"].includes(t.status),
   ).length;
   const delivered = trips.filter((t) =>
     ["DELIVERED", "DOCUMENTS_SUBMITTED"].includes(t.status),
@@ -4141,12 +4257,12 @@ function TripOpsReport({
           onClick={() => onMetricClick("New")}
         />
         <Stat
-          label="Pending Start"
+          label="Driver Pending"
           value={pending}
           tone="blue"
           hint="Assigned · Pre-trip"
           icon={<Truck size={18} />}
-          onClick={() => onMetricClick("Pending")}
+          onClick={() => onMetricClick("Driver Pending")}
         />
         <Stat
           label="Active"
@@ -4154,15 +4270,15 @@ function TripOpsReport({
           tone="purple"
           hint="Currently in transit"
           icon={<Truck size={18} />}
-          onClick={() => onMetricClick("Active")}
+          onClick={() => onMetricClick("In Transit")}
         />
         <Stat
-          label="Delivered"
+          label="Docs Uploaded"
           value={delivered}
           tone="green"
           hint="Docs pending/submitted"
           icon={<ChartPie size={18} />}
-          onClick={() => onMetricClick("Delivered")}
+          onClick={() => onMetricClick("Docs Uploaded")}
         />
         <Stat
           label="Completed"
@@ -4170,7 +4286,7 @@ function TripOpsReport({
           tone="green"
           hint="Finalized"
           icon={<ChartPie size={18} />}
-          onClick={() => onMetricClick("Completed")}
+          onClick={() => onMetricClick("Complete")}
         />
         <Stat
           label="Rejected"
@@ -4178,7 +4294,7 @@ function TripOpsReport({
           tone="red"
           hint="Ops / Driver rejected"
           icon={<Clock size={18} />}
-          onClick={() => onMetricClick("Rejected")}
+          onClick={() => onMetricClick("Rejected (Ops)")}
         />
       </section>
     </div>
@@ -4973,11 +5089,42 @@ function FuelTransactionsPage({
   const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
-  useEffect(() => {
+  const [draftStatus, setDraftStatus] = useState("All");
+  const [draftDateFrom, setDraftDateFrom] = useState("");
+  const [draftDateTo, setDraftDateTo] = useState("");
+
+  function openFilters() {
+    setDraftStatus(statusFilter);
+    setDraftDateFrom(dateFrom);
+    setDraftDateTo(dateTo);
+    setShowFilters(true);
+  }
+
+  function clearAllFilters() {
+    setDraftStatus("All");
+    setDraftDateFrom("");
+    setDraftDateTo("");
     setStatusFilter("All");
-    setQuery("");
     setDateFrom("");
     setDateTo("");
+    setShowFilters(false);
+  }
+
+  function applyFilters() {
+    setStatusFilter(draftStatus);
+    setDateFrom(draftDateFrom);
+    setDateTo(draftDateTo);
+    setShowFilters(false);
+  }
+
+  useEffect(() => {
+    setStatusFilter("All");
+    setDraftStatus("All");
+    setQuery("");
+    setDateFrom("");
+    setDraftDateFrom("");
+    setDateTo("");
+    setDraftDateTo("");
     setShowFilters(false);
   }, [view]);
   const filtered = transactions.filter((tx) => {
@@ -4993,26 +5140,34 @@ function FuelTransactionsPage({
   const activeFilters =
     (statusFilter !== "All" ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0);
   return (
-    <section className="panel list-panel">
-      <div className="panel-header">
+    <section className="panel list-panel" style={{ overflow: "hidden" }}>
+      <div className="panel-header" style={{ marginBottom: 12 }}>
         <div>
-          <h2>Fuel Transactions</h2>
-          <p>Dispatch fuel authorisations to pump stations.</p>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--muted-ink)" }}>
+            Dispatch fuel authorisations to pump stations.
+          </p>
         </div>
       </div>
       <div
         className="filters"
-        style={{ alignItems: "center", gap: 10, flexWrap: "nowrap" }}
+        style={{
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "nowrap",
+          width: "100%",
+          marginBottom: 16,
+        }}
       >
-        <div className="search">
+        <div className="search" style={{ flex: 1, minWidth: 0 }}>
           <MagnifyingGlass
             size={16}
-            style={{ color: "#9ca6b4", marginRight: 4 }}
+            style={{ color: "#9ca6b4", marginRight: 4, flexShrink: 0 }}
           />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search trip, driver, station"
+            style={{ width: "100%", minWidth: 0 }}
           />
         </div>
         <div style={{ position: "relative", flexShrink: 0 }}>
@@ -5020,7 +5175,7 @@ function FuelTransactionsPage({
             className="icon-create"
             aria-label="Open filters"
             title="Filters"
-            onClick={() => setShowFilters((v) => !v)}
+            onClick={() => (showFilters ? setShowFilters(false) : openFilters())}
             style={{ width: 40, height: 40, minWidth: 40 }}
           >
             <FunnelSimple size={16} />
@@ -5047,128 +5202,347 @@ function FuelTransactionsPage({
             )}
           </button>
           {showFilters && (
-            <div
-              style={{
-                position: "absolute",
-                top: "calc(100% + 8px)",
-                right: 0,
-                background: "var(--surface)",
-                border: "1px solid var(--line)",
-                borderRadius: 12,
-                padding: 14,
-                minWidth: 260,
-                zIndex: 20,
-                boxShadow: "0 12px 32px rgb(15 23 42 / 10%)",
-              }}
-            >
-              <p
+            <>
+              <div
+                role="presentation"
+                onClick={() => setShowFilters(false)}
                 style={{
-                  margin: "0 0 10px",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "var(--muted-ink)",
-                  textTransform: "uppercase",
-                  letterSpacing: ".08em",
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(15, 23, 42, 0.2)",
+                  zIndex: 35,
                 }}
-              >
-                Status
-              </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {["All", "Pending", "Sent", "Resent"].map((f) => (
-                  <button
-                    key={f}
-                    className={statusFilter === f ? "filter active" : "filter"}
-                    style={{ fontSize: 11 }}
-                    onClick={() => setStatusFilter(f)}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
-              <div style={{ height: 12 }} />
-              <p
-                style={{
-                  margin: "0 0 10px",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "var(--muted-ink)",
-                  textTransform: "uppercase",
-                  letterSpacing: ".08em",
-                }}
-              >
-                Date range
-              </p>
-              <DateRangeFilter
-                dateFrom={dateFrom}
-                dateTo={dateTo}
-                onFrom={setDateFrom}
-                onTo={setDateTo}
               />
-            </div>
+              <div
+                role="dialog"
+                aria-label="Fuel transaction filters"
+                style={{
+                  position: "fixed",
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  zIndex: 40,
+                  background: "var(--surface, #fff)",
+                  borderTopLeftRadius: 24,
+                  borderTopRightRadius: 24,
+                  boxShadow: "0 -16px 40px rgba(15, 23, 42, 0.18)",
+                  maxHeight: "80vh",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <div
+                  style={{
+                    width: 42,
+                    height: 4,
+                    borderRadius: 999,
+                    background: "#dbe3ee",
+                    margin: "12px auto 4px",
+                    flexShrink: 0,
+                  }}
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 20px 12px",
+                    borderBottom: "1px solid var(--line)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <div>
+                    <b style={{ fontSize: 17, color: "var(--ink)" }}>Filter Transactions</b>
+                    {activeFilters > 0 && (
+                      <span style={{ fontSize: 12, color: "var(--muted-ink)", marginLeft: 8 }}>
+                        ({activeFilters} active)
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <button
+                      type="button"
+                      className="text-button"
+                      style={{ fontSize: 13, color: "var(--blue)", fontWeight: 600 }}
+                      onClick={clearAllFilters}
+                    >
+                      Reset All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowFilters(false)}
+                      aria-label="Close filters"
+                      style={{
+                        background: "var(--line-light, #f1f5f9)",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: 30,
+                        height: 30,
+                        display: "grid",
+                        placeItems: "center",
+                        cursor: "pointer",
+                        color: "var(--ink)",
+                      }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: "16px 20px",
+                    overflowY: "auto",
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 20,
+                  }}
+                >
+                  <div>
+                    <p
+                      style={{
+                        margin: "0 0 10px",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "var(--muted-ink)",
+                        textTransform: "uppercase",
+                        letterSpacing: ".08em",
+                      }}
+                    >
+                      Status
+                    </p>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      {["All", "Pending", "Sent", "Resent"].map((f) => {
+                        const isSelected = draftStatus === f;
+                        return (
+                          <button
+                            key={f}
+                            type="button"
+                            onClick={() => setDraftStatus(f)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "10px 12px",
+                              borderRadius: 10,
+                              border: isSelected
+                                ? "1.5px solid var(--blue)"
+                                : "1px solid var(--line)",
+                              background: isSelected
+                                ? "var(--blue-soft, #eff6ff)"
+                                : "var(--surface)",
+                              color: isSelected ? "var(--blue)" : "var(--ink)",
+                              fontSize: 13,
+                              fontWeight: isSelected ? 600 : 500,
+                              cursor: "pointer",
+                              textAlign: "left",
+                            }}
+                          >
+                            <span>{f}</span>
+                            {isSelected && (
+                              <CheckCircle size={15} style={{ color: "var(--blue)", flexShrink: 0 }} />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p
+                      style={{
+                        margin: "0 0 10px",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "var(--muted-ink)",
+                        textTransform: "uppercase",
+                        letterSpacing: ".08em",
+                      }}
+                    >
+                      Date Range
+                    </p>
+                    <DateRangeFilter
+                      dateFrom={draftDateFrom}
+                      dateTo={draftDateTo}
+                      onFrom={setDraftDateFrom}
+                      onTo={setDraftDateTo}
+                    />
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: "12px 20px 16px",
+                    borderTop: "1px solid var(--line)",
+                    background: "var(--surface, #fff)",
+                    display: "flex",
+                    gap: 10,
+                    flexShrink: 0,
+                  }}
+                >
+                  <button
+                    className="button secondary"
+                    style={{ flex: 1, padding: "12px", fontSize: 14, borderRadius: 10 }}
+                    onClick={clearAllFilters}
+                    type="button"
+                  >
+                    Clear All
+                  </button>
+                  <button
+                    className="button primary"
+                    style={{ flex: 2, padding: "12px", fontSize: 14, borderRadius: 10, fontWeight: 700 }}
+                    onClick={applyFilters}
+                    type="button"
+                  >
+                    Apply Filters
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>
-      {filtered.map((tx) => (
-        <button key={tx.id} className="trip-card" style={{ cursor: "default" }}>
-          <span className="trip-date">
-            <GasPump size={16} style={{ color: "var(--blue)" }} />
-          </span>
-          <span className="request-main">
-            <b>
-              {tx.tripRef} · {tx.driver}
-            </b>
-            <small>
-              {tx.station} · {tx.litres}
-            </small>
-          </span>
-          <span
-            className="status"
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {filtered.map((tx) => (
+          <div
+            key={tx.id}
             style={{
-              background:
-                tx.status === "Pending"
-                  ? "#fef3c7"
-                  : tx.status === "Sent"
-                    ? "#dbeafe"
-                    : "#d1fae5",
-              color:
-                tx.status === "Pending"
-                  ? "#d97706"
-                  : tx.status === "Sent"
-                    ? "#1d4ed8"
-                    : "#065f46",
+              background: "var(--surface)",
+              border: "1px solid var(--line)",
+              borderRadius: 12,
+              padding: 14,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
             }}
           >
-            {tx.status}
-          </span>
-          <span style={{ fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
-            {tx.amount}
-          </span>
-          {tx.status === "Pending" && (
-            <button
-              className="button primary compact"
-              style={{ fontSize: 11 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSendToPump(tx);
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 10,
               }}
             >
-              Send to pump
-            </button>
-          )}
-          {(tx.status === "Sent" || tx.status === "Resent") && (
-            <button
-              className="button secondary compact"
-              style={{ fontSize: 11 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onResend(tx);
-              }}
-            >
-              Resend
-            </button>
-          )}
-        </button>
-      ))}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  minWidth: 0,
+                  flex: 1,
+                }}
+              >
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: "var(--blue-soft)",
+                    display: "grid",
+                    placeItems: "center",
+                    flexShrink: 0,
+                    color: "var(--blue)",
+                  }}
+                >
+                  <GasPump size={18} />
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 14,
+                      color: "var(--ink)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {tx.tripRef} · {tx.driver}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--muted-ink)",
+                      marginTop: 2,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {tx.station} · <b>{tx.litres}</b>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  textAlign: "right",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-end",
+                  gap: 4,
+                  flexShrink: 0,
+                }}
+              >
+                <span
+                  className="status"
+                  style={{
+                    background:
+                      tx.status === "Pending"
+                        ? "#fef3c7"
+                        : tx.status === "Sent"
+                          ? "#dbeafe"
+                          : "#d1fae5",
+                    color:
+                      tx.status === "Pending"
+                        ? "#d97706"
+                        : tx.status === "Sent"
+                          ? "#1d4ed8"
+                          : "#065f46",
+                    fontSize: 11,
+                    padding: "3px 8px",
+                    borderRadius: 6,
+                    fontWeight: 600,
+                  }}
+                >
+                  {tx.status}
+                </span>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 14,
+                    color: "var(--ink)",
+                  }}
+                >
+                  {tx.amount}
+                </div>
+              </div>
+            </div>
+
+            {tx.status === "Pending" && (
+              <button
+                className="button primary wide"
+                style={{ fontSize: 13, padding: "8px 16px", borderRadius: 8 }}
+                onClick={() => onSendToPump(tx)}
+              >
+                Send to pump
+              </button>
+            )}
+            {(tx.status === "Sent" || tx.status === "Resent") && (
+              <button
+                className="button secondary wide"
+                style={{ fontSize: 13, padding: "8px 16px", borderRadius: 8 }}
+                onClick={() => onResend(tx)}
+              >
+                Resend
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
       {!filtered.length && <Empty label="No fuel transactions found" />}
     </section>
   );

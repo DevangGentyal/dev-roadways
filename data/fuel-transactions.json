@@ -1,22 +1,22 @@
 [
-    {
-        "id": "ft-1",
-        "tripId": "req-1",
-        "tripRef": "DR-101",
-        "driver": "Ramesh Yadav",
-        "station": "BPCL Petrol Pump, Hotgi Road",
-        "amount": "₹15,000",
-        "litres": "150 L",
-        "status": "Pending"
-    },
-    {
-        "id": "ft-2",
-        "tripId": "req-4",
-        "tripRef": "DR-104",
-        "driver": "Suresh Kumar",
-        "station": "BPCL Tembhurni",
-        "amount": "₹18,000",
-        "litres": "180 L",
-        "status": "Sent"
-    }
+  {
+    "id": "ft-1",
+    "tripId": "req-1",
+    "tripRef": "DR-101",
+    "driver": "Ramesh Yadav",
+    "station": "BPCL Petrol Pump, Hotgi Road",
+    "amount": "₹15,000",
+    "litres": "150 L",
+    "status": "Resent"
+  },
+  {
+    "id": "ft-2",
+    "tripId": "req-4",
+    "tripRef": "DR-104",
+    "driver": "Suresh Kumar",
+    "station": "BPCL Tembhurni",
+    "amount": "₹18,000",
+    "litres": "180 L",
+    "status": "Sent"
+  }
 ]

@@ -6,7 +6,7 @@
     "clientId": "client-001",
     "sourceId": "source-001",
     "vehicleId": "MH13AB4721",
-    "status": "available"
+    "status": "unavailable"
   },
   {
     "id": "driver-002",
@@ -15,7 +15,7 @@
     "clientId": "client-002",
     "sourceId": "source-003",
     "vehicleId": "MH13XY8892",
-    "status": "unavailable"
+    "status": "available"
   },
   {
     "id": "driver-003",
@@ -33,7 +33,7 @@
     "clientId": "client-004",
     "sourceId": "source-007",
     "vehicleId": "MH12GH3341",
-    "status": "available"
+    "status": "unavailable"
   },
   {
     "id": "driver-005",
