@@ -1327,11 +1327,11 @@ export default function OpsDashboard() {
             <div className="install-banner">
               <div
                 style={{
-                  width: 48,
-                  height: 48,
+                  width: 44,
+                  height: 44,
                   position: "relative",
                   flexShrink: 0,
-                  borderRadius: 14,
+                  borderRadius: 12,
                   overflow: "hidden",
                   border: "1px solid #dbeafe",
                   background: "#eff6ff",
@@ -1345,16 +1345,22 @@ export default function OpsDashboard() {
                   style={{ objectFit: "cover", transform: "scale(1.18)" }}
                 />
               </div>
-              <div>
-                <b>Install Dev Roadways</b>
-                <p>Get quick access, offline-ready app shell, and faster return visits.</p>
-              </div>
+              <b>Dev Roadways</b>
               <div className="install-actions">
-                <button className="button secondary compact" onClick={dismissInstallBanner} type="button">
-                  Not now
-                </button>
-                <button className="button primary compact" onClick={installApp} type="button">
+                <button
+                  className="button primary compact"
+                  onClick={installApp}
+                  type="button"
+                >
                   Install App
+                </button>
+                <button
+                  className="install-close"
+                  aria-label="Dismiss install prompt"
+                  onClick={dismissInstallBanner}
+                  type="button"
+                >
+                  <X size={16} />
                 </button>
               </div>
             </div>

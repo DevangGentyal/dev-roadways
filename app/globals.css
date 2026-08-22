@@ -318,8 +318,8 @@ nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
+  gap: 12px;
+  padding: 12px 14px;
   margin-bottom: 18px;
   border: 1px solid #e5e7eb;
   border-radius: 14px;
@@ -329,6 +329,7 @@ nav {
 
 .install-banner b {
   display: block;
+  flex: 1;
   font-size: 13px;
   color: #0f172a;
 }
@@ -343,6 +344,18 @@ nav {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+}
+
+.install-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #fff;
+  color: #64748b;
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
 }
 
