@@ -5,7 +5,7 @@
     "type": "LR",
     "uploadedAt": "22 Aug 2026 · 1:25 PM",
     "trip_Id": "DR-101",
-    "status": "uploaded",
+    "status": "verified",
     "tripId": "req-1787385015908"
   },
   {
@@ -14,7 +14,7 @@
     "type": "WB",
     "uploadedAt": "22 Aug 2026 · 1:25 PM",
     "trip_Id": "DR-101",
-    "status": "uploaded",
+    "status": "verified",
     "tripId": "req-1787385015908"
   },
   {
@@ -23,7 +23,7 @@
     "type": "Invoice",
     "uploadedAt": "22 Aug 2026 · 1:25 PM",
     "trip_Id": "DR-101",
-    "status": "uploaded",
+    "status": "verified",
     "tripId": "req-1787385015908"
   }
 ]

@@ -812,6 +812,133 @@ nav {
   border-top: 1px solid var(--line);
 }
 
+/* Standardized Table Layout System */
+.table-page-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
+.table-section-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.table-tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.table-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.table-section-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.table-search-box {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--surface);
+}
+
+.table-search-box input {
+  border: 0;
+  outline: 0;
+  width: 100%;
+  color: var(--ink);
+  font-size: 13px;
+  background: transparent;
+}
+
+.table-filter-btn {
+  height: 38px;
+  min-width: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.table-filter-btn:hover {
+  background: var(--canvas);
+}
+
+.table-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.table-ui {
+  width: 100%;
+  min-width: max-content;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table-ui th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.table-ui td {
+  padding: 12px 14px;
+  color: var(--ink);
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.table-ui tr:last-child td {
+  border-bottom: none;
+}
+
+.table-ui tr:hover td {
+  background: #f8fafc;
+}
+
 .list-panel .request-row {
   grid-template-columns: 30px 1.2fr 1fr 1fr 83px 12px;
 }
@@ -1154,7 +1281,7 @@ nav {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 10;
+  z-index: 1000;
   background: rgb(24 34 48 / 35%);
   display: grid;
   place-items: center;
@@ -1289,7 +1416,7 @@ nav {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 40;
+  z-index: 30;
   display: flex;
   align-items: center;
   justify-content: space-around;
