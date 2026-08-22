@@ -5,7 +5,7 @@
     "type": "LR",
     "uploadedAt": "22 Aug 2026 · 1:25 PM",
     "trip_Id": "DR-101",
-    "status": "uploaded",
+    "status": "verified",
     "tripId": "req-1787385015908"
   },
   {
@@ -14,7 +14,7 @@
     "type": "WB",
     "uploadedAt": "22 Aug 2026 · 1:25 PM",
     "trip_Id": "DR-101",
-    "status": "uploaded",
+    "status": "verified",
     "tripId": "req-1787385015908"
   },
   {
@@ -23,7 +23,34 @@
     "type": "Invoice",
     "uploadedAt": "22 Aug 2026 · 1:25 PM",
     "trip_Id": "DR-101",
-    "status": "uploaded",
+    "status": "verified",
+    "tripId": "req-1787385015908"
+  },
+  {
+    "id": "doc-1787409798576-6",
+    "name": "Software Engineer - P1 - Job Description - Wave 4 - Campus Hiring.pdf",
+    "type": "LR (stamped)",
+    "uploadedAt": "22 Aug · 8:13 PM",
+    "trip_Id": "DR-101",
+    "status": "verified",
+    "tripId": "req-1787385015908"
+  },
+  {
+    "id": "doc-1787409837594-7",
+    "name": "Details of Entrata Internship   PPO 2027  batch  17 Aug 2026.pdf",
+    "type": "WB (stamped)",
+    "uploadedAt": "22 Aug · 8:13 PM",
+    "trip_Id": "DR-101",
+    "status": "verified",
+    "tripId": "req-1787385015908"
+  },
+  {
+    "id": "doc-1787409862881-8",
+    "name": "Details of Entrata Internship   PPO 2027  batch  17 Aug 2026.pdf",
+    "type": "Invoice (stamped)",
+    "uploadedAt": "22 Aug · 8:14 PM",
+    "trip_Id": "DR-101",
+    "status": "verified",
     "tripId": "req-1787385015908"
   }
 ]

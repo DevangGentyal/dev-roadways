@@ -6,7 +6,7 @@
     "clientId": "client-001",
     "sourceId": "source-001",
     "vehicleId": "MH13AB4721",
-    "status": "available"
+    "status": "unavailable"
   },
   {
     "id": "driver-002",

@@ -1,6 +1,12 @@
+"use client";
+
 import Image from "next/image";
+import { useTranslation } from "@/lib/i18n";
+import { LanguageSelector } from "@/components/language-selector";
 
 export default function OfflinePage() {
+  const { t } = useTranslation();
+
   return (
     <div
       style={{
@@ -8,8 +14,7 @@ export default function OfflinePage() {
         display: "grid",
         placeItems: "center",
         padding: "24px",
-        background:
-          "linear-gradient(180deg, #f8fbff 0%, #f3f7fd 100%)",
+        background: "linear-gradient(180deg, #f8fbff 0%, #f3f7fd 100%)",
         color: "#0f172a",
         textAlign: "center",
       }}
@@ -25,6 +30,9 @@ export default function OfflinePage() {
           boxShadow: "0 10px 28px rgba(15,23,42,0.06)",
         }}
       >
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+          <LanguageSelector />
+        </div>
         <div
           style={{
             width: 68,
@@ -39,19 +47,21 @@ export default function OfflinePage() {
         >
           <Image
             src="/icon.svg"
-            alt="Dev Roadways"
+            alt={t("common.appName", undefined, "Dev Roadways")}
             fill
             priority
             style={{ objectFit: "cover", transform: "scale(1.18)" }}
           />
         </div>
         <h1 style={{ margin: 0, fontSize: 24, letterSpacing: "-0.03em" }}>
-          You are offline
+          {t("offline.title", undefined, "You are offline")}
         </h1>
         <p style={{ margin: "10px 0 0", color: "#64748b", lineHeight: 1.6 }}>
-          Dev Roadways is ready to open again as soon as your connection comes
-          back. Business data stays live and will sync from the server when
-          available.
+          {t(
+            "offline.desc",
+            undefined,
+            "Dev Roadways is ready to open again as soon as your connection comes back. Business data stays live and will sync from the server when available."
+          )}
         </p>
       </div>
     </div>

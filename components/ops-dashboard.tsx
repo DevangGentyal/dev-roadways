@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation, localizeName } from "@/lib/i18n";
+import { LanguageSelector } from "@/components/language-selector";
 import {
   House,
   Truck,
@@ -38,7 +40,7 @@ type Role = "Coordinator" | "Operations" | "Driver" | "Super Admin";
 
 type DriverFlowState = {
   tripId: string;
-  step: number; // 1: LR, 2: WB, 3: Invoice, 4: Start Trip, 5: In Transit, 6: Stamped Docs, 7: Finished
+  step: number; // 1: LR, 2: WB, 3: Invoice, 4: Start Trip, 5: In Transit, 6: Stamped Docs, 7: {t("driverWorkflow.finishBtn")}ed
   lrDocName?: string;
   wbDocName?: string;
   invoiceDocName?: string;
@@ -364,6 +366,7 @@ const seedTrips: Trip[] = [
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function OpsDashboard() {
+  const { t } = useTranslation();
   const [role, setRole] = useState<Role>("Coordinator");
   const [trips, setTrips] = useState<Trip[]>([]);
   const [followups, setFollowups] = useState<Followup[]>([]);
@@ -470,15 +473,15 @@ export default function OpsDashboard() {
           : role === "Operations"
             ? ["dashboard", "trips", "trip-detail", "followups", "fuel"]
             : [
-                "dashboard",
-                "trips",
-                "trip-detail",
-                "fuel",
-                "reports-ops",
-                "reports-fuel",
-                "reports-cash",
-                "approvals",
-              ];
+              "dashboard",
+              "trips",
+              "trip-detail",
+              "fuel",
+              "reports-ops",
+              "reports-fuel",
+              "reports-cash",
+              "approvals",
+            ];
     if (!allowedViews.includes(targetView)) return;
     setTripsFilter("All");
     setFollowupTripFilter("");
@@ -676,20 +679,20 @@ export default function OpsDashboard() {
   const visibleTrips =
     role === "Driver"
       ? trips.filter((t) =>
-          [
-            "DRIVER_PENDING",
-            "DRIVER_ACCEPTED",
-            "PREPARING",
-            "READY",
-            "IN_TRANSIT",
-            "ON_HOLD",
-            "REACHED",
-            "DELIVERED",
-            "DOCUMENTS_SUBMITTED",
-            "STAMPED_DOCS_SUBMITTED",
-            "COMPLETED",
-          ].includes(t.status) && Boolean(t.driver),
-        )
+        [
+          "DRIVER_PENDING",
+          "DRIVER_ACCEPTED",
+          "PREPARING",
+          "READY",
+          "IN_TRANSIT",
+          "ON_HOLD",
+          "REACHED",
+          "DELIVERED",
+          "DOCUMENTS_SUBMITTED",
+          "STAMPED_DOCS_SUBMITTED",
+          "COMPLETED",
+        ].includes(t.status) && Boolean(t.driver),
+      )
       : trips;
   const [docPurpose, setDocPurpose] = useState<"regular" | "submit_docs">(
     "regular",
@@ -717,10 +720,10 @@ export default function OpsDashboard() {
     const nextExtras = allExtras.map((x) =>
       x.id === extraId
         ? {
-            ...x,
-            status: newStatus === "Approved" ? ("Approved" as const) : ("Rejected" as const),
-            approvedAt: newStatus === "Approved" ? ts : x.approvedAt || "—",
-          }
+          ...x,
+          status: newStatus === "Approved" ? ("Approved" as const) : ("Rejected" as const),
+          approvedAt: newStatus === "Approved" ? ts : x.approvedAt || "—",
+        }
         : x,
     );
     setAllExtras(nextExtras);
@@ -729,10 +732,10 @@ export default function OpsDashboard() {
       extras: (t.extras || []).map((x) =>
         x.id === extraId
           ? {
-              ...x,
-              status: newStatus === "Approved" ? ("Approved" as const) : ("Rejected" as const),
-              approvedAt: newStatus === "Approved" ? ts : x.approvedAt || "—",
-            }
+            ...x,
+            status: newStatus === "Approved" ? ("Approved" as const) : ("Rejected" as const),
+            approvedAt: newStatus === "Approved" ? ts : x.approvedAt || "—",
+          }
           : x,
       ),
     }));
@@ -1199,39 +1202,47 @@ export default function OpsDashboard() {
 
   const title =
     view === "dashboard"
-      ? `Namaste, ${ROLE_GREETINGS[role]}`
+      ? t("greetings.hello", { name: t(`greetings.${role === "Coordinator" ? "coordinator" : role === "Operations" ? "operations" : role === "Driver" ? "driver" : "superAdmin"}`) })
       : view === "active"
-        ? "Active"
-      : view === "trips" || view === "trip-detail"
-        ? "Trips"
-        : view === "followups"
-          ? "Follow-ups"
-        : view === "fuel"
-            ? "Fuel Transactions"
-            : view === "reports-ops"
-              ? "Trip Operations Report"
-              : view === "reports-fuel"
-                ? "Fuel & Extra Fuel Reports"
-                : view === "reports-cash"
-                  ? "Cash Advances Report"
-                  : view === "approvals"
-                    ? "Super Admin Approvals"
-                    : "Overview";
+        ? t("nav.activeTrips")
+        : view === "trips" || view === "trip-detail"
+          ? t("nav.trips")
+          : view === "followups"
+            ? t("nav.followups")
+            : view === "fuel"
+              ? t("nav.fuelTransactions")
+              : view === "reports-ops"
+                ? t("nav.tripOpsReport")
+                : view === "reports-fuel"
+                  ? t("nav.fuelReports")
+                  : view === "reports-cash"
+                    ? t("nav.cashAdvances")
+                    : view === "approvals"
+                      ? t("nav.approvalsHub")
+                      : t("common.overview");
 
   return (
     <div className="app-shell app-shell-bottom-nav">
       <main className="main">
         <header className="topbar">
           <div className="crumb">
-          {role === "Super Admin" ? "Admin" : "Operations"} <span>/</span>{" "}
-            {view === "dashboard" ? "Overview" : title}
+            {role === "Super Admin"
+              ? t("nav.roles.superAdmin", undefined, "Admin")
+              : role === "Coordinator"
+                ? t("nav.roles.coordinator", undefined, "Coordinator")
+                : role === "Driver"
+                  ? t("nav.roles.driver", undefined, "Driver")
+                  : t("nav.roles.operations", undefined, "Operations")}{" "}
+            <span>/</span>{" "}
+            {view === "dashboard" ? t("common.overview", undefined, "Overview") : title}
           </div>
           <div className="top-actions">
-            <button className="icon-button" aria-label="Notifications">
+            <LanguageSelector />
+            <button className="icon-button" aria-label={t("nav.notifications", undefined, "Notifications")}>
               <Bell size={18} />
             </button>
             <div className="role-switch">
-              <span>Viewing as</span>
+              <span>{t("nav.roleSwitch", undefined, "Viewing as")}</span>
               <select
                 value={role}
                 onChange={(e) => {
@@ -1240,10 +1251,10 @@ export default function OpsDashboard() {
                 }}
                 aria-label="Select role"
               >
-                <option>Coordinator</option>
-                <option>Operations</option>
-                <option>Driver</option>
-                <option>Super Admin</option>
+                <option value="Coordinator">{t("nav.roles.coordinator")}</option>
+                <option value="Operations">{t("nav.roles.operations")}</option>
+                <option value="Driver">{t("nav.roles.driver")}</option>
+                <option value="Super Admin">{t("nav.roles.superAdmin")}</option>
               </select>
             </div>
           </div>
@@ -1281,7 +1292,7 @@ export default function OpsDashboard() {
                             size={16}
                             style={{ display: "inline", marginRight: 6 }}
                           />
-                          <span>Import Excel</span>
+                          <span>{t("trip.importExcel")}</span>
                         </button>
                         <button
                           className="button primary"
@@ -1291,7 +1302,7 @@ export default function OpsDashboard() {
                             size={16}
                             style={{ display: "inline", marginRight: 6 }}
                           />
-                          <span>New trip</span>
+                          <span>{t("trip.newTrip")}</span>
                         </button>
                       </div>
                     )}
@@ -1318,7 +1329,7 @@ export default function OpsDashboard() {
                 />
               ) : (
                 <>
-              {view === "dashboard" && (
+                  {view === "dashboard" && (
                     <Dashboard
                       trips={visibleTrips}
                       fuelTransactions={fuelTransactions}
@@ -1349,25 +1360,25 @@ export default function OpsDashboard() {
                       }}
                     />
                   )}
-              {view === "active" && role === "Driver" && (
-                <ActiveTripsPage
-                  trips={visibleTrips}
-                  activeDriverFlow={activeDriverFlow}
-                  onResumeFlow={(t) => {
-                    const docs = t.documents.map((d) => d.type);
-                    let step = 1;
-                    if (t.status === "REACHED") {
-                      if (docs.includes("WB (stamped)")) step = 8;
-                      else if (docs.includes("LR (stamped)")) step = 7;
-                      else step = 6;
-                    } else if (t.status === "IN_TRANSIT") step = 5;
-                    else if (docs.includes("Invoice")) step = 4;
-                    else if (docs.includes("WB")) step = 3;
-                    else if (docs.includes("LR")) step = 2;
-                    updateDriverFlowState({ tripId: t.id, step });
-                  }}
-                />
-              )}
+                  {view === "active" && role === "Driver" && (
+                    <ActiveTripsPage
+                      trips={visibleTrips}
+                      activeDriverFlow={activeDriverFlow}
+                      onResumeFlow={(t: Trip) => {
+                        const docs = t.documents.map((d: TripDocument) => d.type);
+                        let step = 1;
+                        if (t.status === "REACHED") {
+                          if (docs.includes("WB (stamped)")) step = 8;
+                          else if (docs.includes("LR (stamped)")) step = 7;
+                          else step = 6;
+                        } else if (t.status === "IN_TRANSIT") step = 5;
+                        else if (docs.includes("Invoice")) step = 4;
+                        else if (docs.includes("WB")) step = 3;
+                        else if (docs.includes("LR")) step = 2;
+                        updateDriverFlowState({ tripId: t.id, step });
+                      }}
+                    />
+                  )}
                   {view === "trips" && (
                     <TripList
                       trips={visibleTrips}
@@ -1401,9 +1412,9 @@ export default function OpsDashboard() {
                   onFollowup={
                     role === "Operations"
                       ? () => {
-                          setFollowupTripFilter(selected.reference);
-                          setView("followups");
-                        }
+                        setFollowupTripFilter(selected.reference);
+                        setView("followups");
+                      }
                       : undefined
                   }
                   onApprove={(t) => setApprovePendingTrip(t)}
@@ -1458,13 +1469,13 @@ export default function OpsDashboard() {
                   />
                 )}
               {view === "reports-ops" && (
-                  <TripOpsReport
-                    trips={trips}
-                    onMetricClick={(f: string) => {
-                  setTripsFilter(f);
-                  setView("trips");
-                    }}
-                  />
+                <TripOpsReport
+                  trips={trips}
+                  onMetricClick={(f: string) => {
+                    setTripsFilter(f);
+                    setView("trips");
+                  }}
+                />
               )}
               {view === "reports-fuel" && (
                 <FuelReportsPage
@@ -1653,32 +1664,33 @@ function BottomBar({
   pendingApprovalsCount: number;
   onNavigate: (next: "overview" | "active" | "trips" | "fuel" | "cash" | "approvals" | "followups") => void;
 }) {
+  const { t } = useTranslation();
   const items =
     role === "Driver"
       ? [
-          { id: "overview", icon: <House size={20} />, label: "Overview" },
-          { id: "active", icon: <Drop size={20} />, label: "Active" },
-          { id: "trips", icon: <Truck size={20} />, label: "Trips", count: newCount },
-        ]
+        { id: "overview", icon: <House size={20} />, label: t("common.overview", undefined, "Overview") },
+        { id: "active", icon: <Drop size={20} />, label: t("nav.activeTrips", undefined, "Active") },
+        { id: "trips", icon: <Truck size={20} />, label: t("nav.trips", undefined, "Trips"), count: newCount },
+      ]
       : role === "Coordinator"
         ? [
-            { id: "overview", icon: <House size={20} />, label: "Overview" },
-            { id: "trips", icon: <Truck size={20} />, label: "Trips", count: newCount },
-          ]
+          { id: "overview", icon: <House size={20} />, label: t("common.overview", undefined, "Overview") },
+          { id: "trips", icon: <Truck size={20} />, label: t("nav.trips", undefined, "Trips"), count: newCount },
+        ]
         : role === "Operations"
           ? [
-              { id: "overview", icon: <House size={20} />, label: "Overview" },
-              { id: "trips", icon: <Truck size={20} />, label: "Trips", count: newCount },
-              { id: "fuel", icon: <GasPump size={20} />, label: "Fuel" },
-              { id: "followups", icon: <Clock size={20} />, label: "Follow-ups" },
-            ]
+            { id: "overview", icon: <House size={20} />, label: t("common.overview", undefined, "Overview") },
+            { id: "trips", icon: <Truck size={20} />, label: t("nav.trips", undefined, "Trips"), count: newCount },
+            { id: "fuel", icon: <GasPump size={20} />, label: t("nav.fuel", undefined, "Fuel") },
+            { id: "followups", icon: <Clock size={20} />, label: t("nav.followups", undefined, "Follow-ups") },
+          ]
           : [
-              { id: "overview", icon: <House size={20} />, label: "Overview" },
-              { id: "trips", icon: <Truck size={20} />, label: "Trips" },
-              { id: "fuel", icon: <GasPump size={20} />, label: "Fuel" },
-              { id: "cash", icon: <CurrencyInr size={20} />, label: "Cash" },
-              { id: "approvals", icon: <CheckCircle size={20} />, label: "Approvals", count: pendingApprovalsCount },
-            ];
+            { id: "overview", icon: <House size={20} />, label: t("common.overview", undefined, "Overview") },
+            { id: "trips", icon: <Truck size={20} />, label: t("nav.trips", undefined, "Trips") },
+            { id: "fuel", icon: <GasPump size={20} />, label: t("nav.fuel", undefined, "Fuel") },
+            { id: "cash", icon: <CurrencyInr size={20} />, label: t("nav.cashAdvances", undefined, "Cash") },
+            { id: "approvals", icon: <CheckCircle size={20} />, label: t("nav.approvals", undefined, "Approvals"), count: pendingApprovalsCount },
+          ];
 
   return (
     <nav className="bottom-bar" aria-label="Primary">
@@ -1712,10 +1724,11 @@ function BottomBar({
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
   const { bg, color } = getStatusColors(status);
   return (
     <span className="status" style={{ background: bg, color }}>
-      {getStatusLabel(status)}
+      {t(`statuses.${status}`, undefined, getStatusLabel(status))}
     </span>
   );
 }
@@ -1735,9 +1748,10 @@ function ActiveTripsPage({
   onResumeFlow,
 }: {
   trips: Trip[];
-  activeDriverFlow?: DriverFlowState | null;
+  activeDriverFlow?: { tripId: string; step: number } | null;
   onResumeFlow: (t: Trip) => void;
 }) {
+  const { t, language } = useTranslation();
   const activeTrips = trips.filter((t) =>
     [
       "DRIVER_ACCEPTED",
@@ -1755,15 +1769,15 @@ function ActiveTripsPage({
     <section className="panel list-panel active-panel">
       <div className="panel-header">
         <div>
-          <h2>Active</h2>
-          <p>Current live trip work and journey state.</p>
+          <h2>{t("nav.activeTrips")}</h2>
+          <p>{t("greetings.coordinatorSubtitle")}</p>
         </div>
       </div>
       {activeDriverFlow && (
         <div className="active-banner">
           <div>
-            <b>Active workflow in progress</b>
-            <span>Resume the current driver flow from where it stopped.</span>
+            <b>{t("driverWorkflow.title")}</b>
+            <span>{t("driverWorkflow.subtitle")}</span>
           </div>
         </div>
       )}
@@ -1778,13 +1792,13 @@ function ActiveTripsPage({
             <div className="active-card-main">
               <b>{trip.reference}</b>
               <small>
-                {trip.customer} · {trip.origin} → {trip.destination}
+                {localizeName(trip.customer, language)} · {localizeName(trip.origin, language)} → {localizeName(trip.destination, language)}
               </small>
             </div>
             <StatusBadge status={trip.status} />
           </button>
         ))}
-        {!activeTrips.length && <Empty label="No active trips right now." />}
+        {!activeTrips.length && <Empty label={t("trip.noTripsFound")} />}
       </div>
     </section>
   );
@@ -1819,6 +1833,7 @@ function Dashboard({
   onRejectTrip?: (t: Trip) => void;
   onResumeFlow?: (t: Trip) => void;
 }) {
+  const { t } = useTranslation();
   const newTrips = trips.filter((t) => t.status === "NEW");
   const pendingTrips = trips.filter((t) =>
     ["DRIVER_PENDING", "DRIVER_ACCEPTED", "PREPARING"].includes(t.status),
@@ -1859,10 +1874,10 @@ function Dashboard({
       >
         {role !== "Driver" && (
           <Stat
-            label="New Trips"
+            label={t("stats.newTrips")}
             value={newTrips.length}
             tone="blue"
-            hint="Awaiting Ops review"
+            hint={t("stats.newTripsDesc")}
             icon={<Clock size={18} />}
             onClick={() => onMetricClick("New")}
             alert={role === "Operations" && newTrips.length > 0}
@@ -1870,53 +1885,53 @@ function Dashboard({
         )}
         {role === "Operations" && (
           <Stat
-            label="Pending Fuel Assignments"
+            label={t("fuel.title")}
             value={pendingFuelAssignments.length}
             tone="purple"
-            hint="Awaiting fuel dispatch"
+            hint={t("fuel.subtitle")}
             icon={<GasPump size={18} />}
             onClick={onOpenFuel}
             alert={role === "Operations" && pendingFuelAssignments.length > 0}
           />
         )}
         <Stat
-          label="Driver Pending"
+          label={t("stats.driverPending")}
           value={pendingTrips.length}
           tone="blue"
-          hint="Assigned · Pre-trip"
+          hint={t("stats.driverPendingDesc")}
           icon={<Truck size={18} />}
           onClick={() => onMetricClick("Driver Pending")}
         />
         <Stat
-          label="Active Trips"
+          label={t("stats.activeTrips")}
           value={activeTrips.length}
           tone="purple"
-          hint="Currently in transit"
+          hint={t("stats.activeTripsDesc")}
           icon={<Truck size={18} />}
           onClick={() => onMetricClick("In Transit")}
         />
         <Stat
-          label="Docs Uploaded"
+          label={t("stats.docsUploaded")}
           value={deliveredTrips.length}
           tone="green"
-          hint="Awaiting verification"
+          hint={t("stats.docsUploadedDesc")}
           icon={<ChartPie size={18} />}
           onClick={() => onMetricClick("Docs Uploaded")}
         />
         <Stat
-          label="Completed"
+          label={t("stats.completed")}
           value={completedTrips.length}
           tone="green"
-          hint="Finalized"
+          hint={t("stats.completedDesc")}
           icon={<ChartPie size={18} />}
           onClick={() => onMetricClick("Complete")}
         />
         {role !== "Driver" && (
           <Stat
-            label="Rejected"
+            label={t("stats.rejected")}
             value={rejectedTrips.length}
             tone="red"
-            hint="Ops / Driver rejected"
+            hint={t("stats.rejectedDesc")}
             icon={<Clock size={18} />}
             onClick={() => onMetricClick("Rejected (Ops)")}
           />
@@ -1943,6 +1958,7 @@ function Stat({
   onClick?: () => void;
   alert?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <button
       className="stat"
@@ -1985,6 +2001,7 @@ function Stat({
 type ApprovalStatus = "Submitted" | "Approved" | "Rejected";
 
 function ApprovalStatusBadge({ status }: { status: ApprovalStatus }) {
+  const { t } = useTranslation();
   const styles =
     status === "Approved"
       ? { background: "#dcfce7", color: "#15803d" }
@@ -2012,6 +2029,7 @@ function ApprovalStatusBadge({ status }: { status: ApprovalStatus }) {
 }
 
 function TripRow({ trip, onClick }: { trip: Trip; onClick: () => void }) {
+  const { t, language } = useTranslation();
   return (
     <button className="trip-card" onClick={onClick}>
       <span className="trip-date">
@@ -2020,15 +2038,15 @@ function TripRow({ trip, onClick }: { trip: Trip; onClick: () => void }) {
       </span>
       <span className="request-main">
         <b>
-          {trip.reference} · {trip.customer}
+          {trip.reference} · {localizeName(trip.customer, language)}
         </b>
         <small>
-          {trip.origin}{" "}
+          {localizeName(trip.origin, language)}{" "}
           <ArrowRight
             size={12}
             style={{ display: "inline", margin: "0 2px", color: "#a4adba" }}
           />{" "}
-          {trip.destination}
+          {localizeName(trip.destination, language)}
         </small>
       </span>
       <StatusBadge status={trip.status} />
@@ -2050,6 +2068,7 @@ function DateRangeFilter({
   onFrom: (v: string) => void;
   onTo: (v: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       style={{
@@ -2069,7 +2088,7 @@ function DateRangeFilter({
             letterSpacing: "0.05em",
           }}
         >
-          From Date
+          {t("modals.filterModal.fromDate", undefined, "From Date")}
         </span>
         <input
           type="date"
@@ -2097,7 +2116,7 @@ function DateRangeFilter({
             letterSpacing: "0.05em",
           }}
         >
-          To Date
+          {t("modals.filterModal.toDate", undefined, "To Date")}
         </span>
         <input
           type="date"
@@ -2135,10 +2154,17 @@ function parseTripDate(trip: Trip): Date | null {
       Nov: 10,
       Dec: 11,
     };
-    const p = trip.date.trim().split(" ");
-    if (p.length === 3)
-      return new Date(Number(p[2]), months[p[1]] ?? 0, Number(p[0]));
-    return null;
+    const parts = (trip.pickupDate || trip.date).trim().split(" ");
+    if (parts.length === 3) {
+      const day = Number(parts[0]);
+      const month = months[parts[1]] ?? 0;
+      const year = Number(parts[2]);
+      const [h, m] = (trip.pickupTime || trip.time || "00:00")
+        .split(":")
+        .map(Number);
+      return new Date(year, month, day, h || 0, m || 0);
+    }
+    return new Date(trip.createdAt);
   } catch {
     return null;
   }
@@ -2163,6 +2189,7 @@ function TripList({
   setFilter: (f: string) => void;
   view?: string;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [dateFrom, setDateFrom] = useState("");
@@ -2213,6 +2240,21 @@ function TripList({
     Reached: ["REACHED", "DELIVERED"],
     "Stamped Docs": ["STAMPED_DOCS_SUBMITTED"],
     Complete: ["COMPLETED"],
+  };
+
+  const filterKeyMap: Record<string, string> = {
+    All: "common.all",
+    New: "statuses.NEW",
+    "Driver Pending": "statuses.DRIVER_PENDING",
+    "Rejected (Ops)": "statuses.REJECTED",
+    Accepted: "statuses.DRIVER_ACCEPTED",
+    "Rejected (Driver)": "statuses.DRIVER_REJECTED",
+    "Docs Uploaded": "statuses.DOCUMENTS_SUBMITTED",
+    "Not Started": "statuses.READY",
+    "In Transit": "statuses.IN_TRANSIT",
+    Reached: "statuses.REACHED",
+    "Stamped Docs": "statuses.STAMPED_DOCS_SUBMITTED",
+    Complete: "statuses.COMPLETED",
   };
 
   const filtered = trips.filter((t) => {
@@ -2296,16 +2338,16 @@ function TripList({
           <div className="panel-header-actions">
             <button
               className="icon-create"
-              aria-label="Import Excel"
-              title="Import Excel"
+              aria-label={t("trip.importExcel", undefined, "Import Excel")}
+              title={t("trip.importExcel", undefined, "Import Excel")}
               onClick={onImport}
             >
               <UploadSimple size={16} />
             </button>
             <button
               className="icon-create"
-              aria-label="New trip"
-              title="New trip"
+              aria-label={t("trip.newTrip", undefined, "New trip")}
+              title={t("trip.newTrip", undefined, "New trip")}
               onClick={onCreate}
             >
               <Plus size={16} />
@@ -2322,7 +2364,7 @@ function TripList({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search reference or customer"
+            placeholder={t("trip.searchPlaceholder", undefined, "Search reference or customer")}
           />
         </div>
         <div
@@ -2353,15 +2395,15 @@ function TripList({
           <div style={{ position: "relative", flexShrink: 0 }}>
             <button
               className="button secondary"
-              aria-label="Open filters"
-              title="Filters"
+              aria-label={t("common.filters", undefined, "Filters")}
+              title={t("common.filters", undefined, "Filters")}
               onClick={() =>
                 showFilters ? setShowFilters(false) : openFilters()
               }
               style={{ height: 40, padding: "0 14px", minWidth: 110, gap: 6 }}
             >
               <FunnelSimple size={16} />
-              <span>Filter{activeFilters ? ` (${activeFilters})` : ""}</span>
+              <span>{t("common.filter", undefined, "Filter")}{activeFilters ? ` (${activeFilters})` : ""}</span>
             </button>
             {showFilters && (
               <>
@@ -2377,7 +2419,7 @@ function TripList({
                 />
                 <div
                   role="dialog"
-                  aria-label="Trip filters"
+                  aria-label={t("common.filters", undefined, "Trip filters")}
                   style={{
                     position: "fixed",
                     left: 0,
@@ -2415,7 +2457,7 @@ function TripList({
                   >
                     <div>
                       <b style={{ fontSize: 17, color: "var(--ink)" }}>
-                        Filters
+                        {t("common.filters", undefined, "Filters")}
                       </b>
                       {activeFilters > 0 && (
                         <span
@@ -2425,7 +2467,7 @@ function TripList({
                             marginLeft: 8,
                           }}
                         >
-                          ({activeFilters} active)
+                          ({activeFilters} {t("common.active", undefined, "active")})
                         </span>
                       )}
                     </div>
@@ -2442,12 +2484,12 @@ function TripList({
                         }}
                         onClick={clearAllFilters}
                       >
-                        Reset All
+                        {t("common.reset", undefined, "Reset All")}
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowFilters(false)}
-                        aria-label="Close filters"
+                        aria-label={t("common.close", undefined, "Close filters")}
                         style={{
                           background: "var(--line-light, #f1f5f9)",
                           border: "none",
@@ -2487,7 +2529,7 @@ function TripList({
                             letterSpacing: ".08em",
                           }}
                         >
-                          Active Filters
+                          {t("common.activeFilters", undefined, "Active Filters")}
                         </p>
                         <div
                           style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
@@ -2509,7 +2551,12 @@ function TripList({
                                 if (chip.startsWith("To ")) setDraftDateTo("");
                               }}
                             >
-                              {chip} <span style={{ marginLeft: 6 }}>×</span>
+                              {chip.startsWith("From ")
+                                ? `${t("common.from", undefined, "From")} ${chip.replace("From ", "")}`
+                                : chip.startsWith("To ")
+                                  ? `${t("common.to", undefined, "To")} ${chip.replace("To ", "")}`
+                                  : t(filterKeyMap[chip] || chip, undefined, chip)}{" "}
+                              <span style={{ marginLeft: 6 }}>×</span>
                             </button>
                           ))}
                         </div>
@@ -2527,7 +2574,7 @@ function TripList({
                           letterSpacing: ".08em",
                         }}
                       >
-                        Trip Status
+                        {t("trip.tripStatus", undefined, "Trip Status")}
                       </p>
                       <div
                         style={{
@@ -2566,7 +2613,7 @@ function TripList({
                                 textAlign: "left",
                               }}
                             >
-                              <span>{f}</span>
+                              <span>{t(filterKeyMap[f] || `statuses.${f}`, undefined, f)}</span>
                               {isSelected && (
                                 <CheckCircle
                                   size={15}
@@ -2593,7 +2640,7 @@ function TripList({
                           letterSpacing: ".08em",
                         }}
                       >
-                        Date Range
+                        {t("reports.dateRange", undefined, "Date Range")}
                       </p>
                       <DateRangeFilter
                         dateFrom={draftDateFrom}
@@ -2625,7 +2672,7 @@ function TripList({
                       onClick={clearAllFilters}
                       type="button"
                     >
-                      Clear All
+                      {t("common.clearAll", undefined, "Clear All")}
                     </button>
                     <button
                       className="button primary"
@@ -2639,7 +2686,7 @@ function TripList({
                       onClick={applyFilters}
                       type="button"
                     >
-                      Apply Filters
+                      {t("common.applyFilters", undefined, "Apply Filters")}
                     </button>
                   </div>
                 </div>
@@ -2668,7 +2715,12 @@ function TripList({
                 if (chip.startsWith("To ")) setDateTo("");
               }}
             >
-              {chip} <span style={{ marginLeft: 6 }}>×</span>
+              {chip.startsWith("From ")
+                ? `${t("common.from", undefined, "From")} ${chip.replace("From ", "")}`
+                : chip.startsWith("To ")
+                  ? `${t("common.to", undefined, "To")} ${chip.replace("To ", "")}`
+                  : t(filterKeyMap[chip] || chip, undefined, chip)}{" "}
+              <span style={{ marginLeft: 6 }}>×</span>
             </button>
           ))}
         </div>
@@ -2678,7 +2730,7 @@ function TripList({
           <TripRow trip={t} onClick={() => onOpen(t)} />
         </div>
       ))}
-      {!sorted.length && <Empty label="No trips match" />}
+      {!sorted.length && <Empty label={t("trip.noTripsFound", undefined, "No trips match")} />}
     </section>
   );
 }
@@ -2696,6 +2748,7 @@ function DocumentPreviewModal({
   onClose: () => void;
   onToggleVerify?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="modal-backdrop" style={{ zIndex: 1100 }}>
       <div
@@ -2805,6 +2858,7 @@ function TripDetail({
   onReminder: () => void;
   onToggleVerifyDoc?: (tripId: string, docId: string) => void;
 }) {
+  const { t, language } = useTranslation();
   const isPendingReview = trip.status === "NEW";
   const hasAssignment = !["NEW", "REJECTED"].includes(trip.status);
   const [previewDoc, setPreviewDoc] = useState<TripDocument | null>(null);
@@ -2813,14 +2867,14 @@ function TripDetail({
     <section className="detail">
       <button className="back" onClick={onBack}>
         <ArrowLeft size={16} style={{ display: "inline", marginRight: 4 }} />{" "}
-        Back to trips
+        {t("trip.backToTrips", undefined, "Back to trips")}
       </button>
       <div className="detail-heading">
         <div>
-          <p className="eyebrow">Trip</p>
+          <p className="eyebrow">{t("trip.reference")}</p>
           <h1>{trip.reference}</h1>
           <p className="subheading">
-            {trip.customer} · Created {trip.createdAt}
+            {localizeName(trip.customer, language)} · Created {trip.createdAt}
           </p>
         </div>
         <div
@@ -2840,7 +2894,7 @@ function TripDetail({
                 onClick={onFollowup}
                 style={{ height: 32 }}
               >
-                <span>Followups</span>
+                <span>{t("nav.followups")}</span>
               </button>
             )}
             {(role === "Coordinator" || role === "Operations") && (
@@ -2894,7 +2948,7 @@ function TripDetail({
               role === "Operations" || isPendingReview ? "span 2" : undefined,
           }}
         >
-          <h2>Journey</h2>
+          <h2>{t("trip.routeInfo")}</h2>
           <div
             className="journey journey-times"
             style={{
@@ -2912,7 +2966,7 @@ function TripDetail({
                 wordBreak: "break-word",
               }}
             >
-              <small>Pickup</small>
+              <small>{t("trip.pickupDate")}</small>
               <b
                 style={{
                   fontSize: 15,
@@ -2922,10 +2976,10 @@ function TripDetail({
                   whiteSpace: "normal",
                 }}
               >
-                {trip.origin}
+                {localizeName(trip.origin, language)}
               </b>
               <span>
-                <em>Scheduled</em>
+                <em>{t("common.pending")}</em>
                 <b>{trip.pickupDate || trip.date}</b>
                 <b>{to12Hour(trip.pickupTime || trip.time)}</b>
               </span>
@@ -2942,7 +2996,7 @@ function TripDetail({
                 wordBreak: "break-word",
               }}
             >
-              <small>Drop-off</small>
+              <small>{t("trip.deliveryDate")}</small>
               <b
                 style={{
                   fontSize: 15,
@@ -2952,53 +3006,53 @@ function TripDetail({
                   whiteSpace: "normal",
                 }}
               >
-                {trip.destination}
+                {localizeName(trip.destination, language)}
               </b>
               <span>
-                <em>Requested</em>
+                <em>{t("trip.requestedDelivery")}</em>
                 <b>{trip.requestedDeliveryDate || trip.date}</b>
                 <b>{to12Hour(trip.requestedDeliveryTime || trip.time)}</b>
               </span>
               {trip.estimatedDropDate && (
                 <span>
-                  <em>Estimated</em>
+                  <em>{t("common.details")}</em>
                   <b>{trip.estimatedDropDate}</b>
                   <b>{to12Hour(trip.estimatedDropTime || "")}</b>
                 </span>
               )}
               <span>
-                <em>Actual</em>
+                <em>{t("common.done")}</em>
                 {trip.actualDropDate ? (
                   <>
                     <b>{trip.actualDropDate}</b>
                     <b>{to12Hour(trip.actualDropTime || "")}</b>
                   </>
                 ) : (
-                  <b>Awaiting delivery</b>
+                  <b>{t("stats.activeTripsDesc")}</b>
                 )}
               </span>
             </div>
           </div>
-          <InfoSection title="Cargo details">
+          <InfoSection title={t("trip.cargoDetails", undefined, "Cargo details")}>
             <Info
-              label="Material"
-              value={trip.cargo?.material || trip.cargoMaterial || "Cement"}
+              label={t("trip.cargoMaterial", undefined, "Material")}
+              value={localizeName(trip.cargo?.material || trip.cargoMaterial || "Cement", language)}
             />
             <Info
-              label="Company"
-              value={trip.cargo?.company || trip.cargoCompany || trip.customer}
+              label={t("trip.cargoCompany", undefined, "Company")}
+              value={localizeName(trip.cargo?.company || trip.cargoCompany || trip.customer, language)}
             />
             <Info
-              label="Cargo weight"
+              label={t("trip.cargoWeight", undefined, "Cargo weight")}
               value={trip.cargo?.quantity || trip.cargoWeight || "—"}
             />
             <Info
-              label="Cargo type"
-              value={trip.cargo?.loadType || trip.cargoType || "Bagged"}
+              label={t("trip.cargoType", undefined, "Cargo type")}
+              value={localizeName(trip.cargo?.loadType || trip.cargoType || "Bagged", language)}
             />
             {(trip.cargo?.loadType || trip.cargoType) === "Bagged" && (
               <Info
-                label="No. of bags"
+                label={t("trip.noOfBags", undefined, "No. of bags")}
                 value={
                   trip.cargo?.noOfBags ||
                   trip.noOfBags ||
@@ -3009,54 +3063,54 @@ function TripDetail({
           </InfoSection>
           {hasAssignment && (
             <>
-              <InfoSection title="Truck details">
+              <InfoSection title={t("trip.truckDetails", undefined, "Truck details")}>
                 <Info
-                  label="Truck number"
+                  label={t("trip.truckNumber", undefined, "Truck number")}
                   value={trip.truck?.number || "Pending assignment"}
                 />
-                <Info label="Truck type" value={trip.truck?.type || "Body"} />
+                <Info label={t("trip.truckType", undefined, "Truck type")} value={localizeName(trip.truck?.type || "Body", language)} />
                 <Info
-                  label="Configuration"
-                  value={trip.truck?.configuration || "12 tyre"}
+                  label={t("trip.tyreConfig", undefined, "Configuration")}
+                  value={localizeName(trip.truck?.configuration || "12 tyre", language)}
                 />
                 <Info
-                  label="Truck brand"
-                  value={trip.truck?.brand || "Tata Motors"}
+                  label={t("trip.brand", undefined, "Truck brand")}
+                  value={localizeName(trip.truck?.brand || "Tata Motors", language)}
                 />
               </InfoSection>
-              <InfoSection title="Driver details">
-                <Info label="Driver name" value={trip.driver || "Unassigned"} />
+              <InfoSection title={t("trip.driverDetails", undefined, "Driver details")}>
+                <Info label={t("trip.driver", undefined, "Driver name")} value={localizeName(trip.driver || "Unassigned", language)} />
                 <Info
-                  label="Phone number"
+                  label={t("common.phone", undefined, "Phone number")}
                   value={trip.driverNumber || "Not available"}
                 />
               </InfoSection>
-              <InfoSection title="Fuel details">
+              <InfoSection title={t("trip.fuelDetails", undefined, "Fuel details")}>
                 <Info
-                  label="Assigned fuel"
+                  label={t("trip.assignedFuel", undefined, "Assigned fuel")}
                   value={trip.fuel?.assigned || "—"}
                 />
                 <Info
-                  label="Received fuel"
+                  label={t("trip.receivedFuel", undefined, "Received fuel")}
                   value={trip.fuel?.received || "—"}
                 />
-                <Info label="Station name" value={trip.fuel?.station || "—"} />
+                <Info label={t("fuel.stationName", undefined, "Station name")} value={localizeName(trip.fuel?.station || "—", language)} />
                 <Info
-                  label="Fulfilled at"
+                  label={t("trip.fulfilledAt", undefined, "Fulfilled at")}
                   value={trip.fuel?.fulfilledAt || "—"}
                 />
               </InfoSection>
-              <InfoSection title="Cash details">
+              <InfoSection title={t("trip.cashDetails", undefined, "Cash details")}>
                 <Info
-                  label="Advanced amount"
+                  label={t("trip.cashAdvance", undefined, "Advanced amount")}
                   value={trip.cash?.advance || "—"}
                 />
                 <Info
-                  label="Payment mode"
-                  value={trip.cash?.paymentMode || "—"}
+                  label={t("trip.paymentMode", undefined, "Payment mode")}
+                  value={localizeName(trip.cash?.paymentMode || "—", language)}
                 />
               </InfoSection>
-              <h2 className="activity-title section-title">Extra expenses</h2>
+              <h2 className="activity-title section-title">{t("trip.extras")}</h2>
               {trip.extras.map((extra) => (
                 <div className="extra-row" key={extra.id}>
                   <span className="extra-icon">
@@ -3071,7 +3125,7 @@ function TripDetail({
                     )}
                   </span>
                   <div>
-                    <b>Extra {extra.type} request</b>
+                    <b>{t("trip.addExtra", undefined, "Extra request")}: {extra.type}</b>
                     <p>{extra.note}</p>
                   </div>
                   <div style={{ textAlign: "right" }}>
@@ -3098,17 +3152,13 @@ function TripDetail({
                               : "#b45309",
                       }}
                     >
-                      {extra.status === "Approved"
-                        ? "Approved"
-                        : extra.status === "Rejected"
-                          ? "Rejected"
-                          : "Submitted"}
+                      {t(`statuses.${extra.status}`, undefined, extra.status)}
                     </span>
                   </div>
                 </div>
               ))}
-              {!trip.extras.length && <Empty label="No extra expenses" />}
-              <h2 className="activity-title">Trip documents</h2>
+              {!trip.extras.length && <Empty label={t("trip.noExtras", undefined, "No extra expenses")} />}
+              <h2 className="activity-title">{t("trip.documents")}</h2>
               {(() => {
                 const uniqueDocsMap = new Map<string, TripDocument>();
                 trip.documents.forEach((d) => {
@@ -3213,7 +3263,7 @@ function TripDetail({
 
                             {(role === "Operations" ||
                               role === "Super Admin") &&
-                            onToggleVerifyDoc ? (
+                              onToggleVerifyDoc ? (
                               <button
                                 type="button"
                                 className={`button ${isVerified ? "secondary" : "primary"} compact`}
@@ -3279,7 +3329,7 @@ function TripDetail({
               onClick={onReminder}
               style={{ marginTop: 20 }}
             >
-              Send reminder to Operations
+              {t("trip.sendReminderToOps", undefined, "Send reminder to Operations")}
             </button>
           )}
         </div>
@@ -3287,24 +3337,23 @@ function TripDetail({
         {/* Operations: review NEW trip */}
         {role === "Operations" && trip.status === "NEW" && (
           <div className="panel action-panel">
-            <h2>Review Request</h2>
+            <h2>{t("approvals.title")}</h2>
             <p>
-              Approve this request to assign a driver and move the trip to
-              DRIVER_PENDING.
+              {t("greetings.operationsSubtitle")}
             </p>
             <button
               className="button primary wide"
               onClick={() => onApprove(trip)}
               style={{ marginTop: 12 }}
             >
-              Approve &amp; Assign Driver
+              {t("trip.approveAndAssign", undefined, "Approve & Assign Driver")}
             </button>
             <button
               className="button danger wide"
               onClick={() => onOpsReject(trip)}
               style={{ marginTop: 8 }}
             >
-              Reject request
+              {t("trip.rejectRequest", undefined, "Reject request")}
             </button>
           </div>
         )}
@@ -3312,23 +3361,23 @@ function TripDetail({
         {/* Driver: accept/reject DRIVER_PENDING trip */}
         {role === "Driver" && trip.status === "DRIVER_PENDING" && (
           <div className="panel action-panel">
-            <h2>Driver Assignment</h2>
+            <h2>{t("trip.assignDriver")}</h2>
             <p>
-              You have been assigned to this trip. Please accept or reject it.
+              {t("greetings.driverSubtitle")}
             </p>
             <button
               className="button primary wide"
               onClick={() => onAccept(trip)}
               style={{ marginTop: 12 }}
             >
-              Accept assignment
+              {t("trip.acceptAssignment", undefined, "Accept assignment")}
             </button>
             <button
               className="button danger wide"
               onClick={() => onDvReject(trip)}
               style={{ marginTop: 8 }}
             >
-              Reject assignment
+              {t("trip.rejectAssignment", undefined, "Reject assignment")}
             </button>
           </div>
         )}
@@ -3336,17 +3385,16 @@ function TripDetail({
         {/* Driver: rejected — re-accept flow */}
         {role === "Driver" && trip.status === "DRIVER_REJECTED" && (
           <div className="panel action-panel">
-            <h2>Assignment Rejected</h2>
+            <h2>{t("statuses.DRIVER_REJECTED")}</h2>
             <p>
-              You previously rejected this trip. Operations can reassign or you
-              may reconsider.
+              {t("greetings.driverSubtitle")}
             </p>
             <button
               className="button primary wide"
               onClick={() => onReAccept(trip)}
               style={{ marginTop: 12 }}
             >
-              Accept assignment
+              {t("trip.acceptAssignment", undefined, "Accept assignment")}
             </button>
           </div>
         )}
@@ -3354,10 +3402,9 @@ function TripDetail({
         {/* Driver: accepted — begin preparation */}
         {role === "Driver" && trip.status === "DRIVER_ACCEPTED" && (
           <div className="panel action-panel">
-            <h2>Pre-Trip Preparation</h2>
+            <h2>{t("driverWorkflow.title")}</h2>
             <p>
-              You accepted this trip. Upload documents and mark as Preparing
-              when ready.
+              {t("driverWorkflow.subtitle")}
             </p>
             <button
               className="button primary wide"
@@ -3368,14 +3415,14 @@ function TripDetail({
                 size={16}
                 style={{ display: "inline", marginRight: 6 }}
               />{" "}
-              Upload trip document
+              {t("modals.docModal.uploadBtn")}
             </button>
             <button
               className="button primary wide"
               onClick={() => onMarkPreparing(trip)}
               style={{ marginTop: 8 }}
             >
-              Start Preparing
+              {t("trip.startPreparing", undefined, "Start Preparing")}
             </button>
           </div>
         )}
@@ -3383,8 +3430,8 @@ function TripDetail({
         {/* Driver: preparing — upload docs, mark ready */}
         {role === "Driver" && trip.status === "PREPARING" && (
           <div className="panel action-panel">
-            <h2>Pre-Trip Checklist</h2>
-            <p>Complete pre-trip documents and mark Ready when all done.</p>
+            <h2>{t("driverWorkflow.subtitle")}</h2>
+            <p>{t("driverWorkflow.step1Desc")}</p>
             <button
               className="button primary wide"
               onClick={onDocument}
@@ -3394,14 +3441,14 @@ function TripDetail({
                 size={16}
                 style={{ display: "inline", marginRight: 6 }}
               />{" "}
-              Upload document
+              {t("modals.docModal.uploadBtn")}
             </button>
             <button
               className="button primary wide"
               onClick={() => onMarkReady(trip)}
               style={{ marginTop: 8 }}
             >
-              Mark Ready to Depart
+              {t("trip.markReady", undefined, "Mark Ready")}
             </button>
           </div>
         )}
@@ -3409,17 +3456,16 @@ function TripDetail({
         {/* Driver: ready — start trip */}
         {role === "Driver" && trip.status === "READY" && (
           <div className="panel action-panel">
-            <h2>Ready for Departure</h2>
+            <h2>{t("statuses.READY")}</h2>
             <p>
-              All pre-trip work complete. Start the journey when loaded and
-              cleared.
+              {t("driverWorkflow.step4Desc")}
             </p>
             <button
               className="button primary wide"
               onClick={() => onStart(trip)}
               style={{ marginTop: 12 }}
             >
-              Start Trip
+              {t("trip.startTrip", undefined, "Start Trip")}
             </button>
           </div>
         )}
@@ -3428,15 +3474,15 @@ function TripDetail({
         {role === "Driver" &&
           (trip.status === "IN_TRANSIT" || trip.status === "ON_HOLD") && (
             <div className="panel action-panel">
-              <h2>In-Transit Actions</h2>
-              <p>Manage journey status during the trip.</p>
+              <h2>{t("statuses.IN_TRANSIT")}</h2>
+              <p>{t("driverWorkflow.step5Desc")}</p>
               {trip.status === "IN_TRANSIT" ? (
                 <button
                   className="button secondary wide"
                   onClick={() => onHold(trip)}
                   style={{ marginTop: 12 }}
                 >
-                  Put Trip On Hold
+                  {t("trip.holdTrip", undefined, "Put Trip On Hold")}
                 </button>
               ) : (
                 <button
@@ -3444,7 +3490,7 @@ function TripDetail({
                   onClick={() => onStart(trip)}
                   style={{ marginTop: 12 }}
                 >
-                  Resume Trip
+                  {t("trip.startTrip", undefined, "Resume Trip")}
                 </button>
               )}
               <button
@@ -3452,7 +3498,7 @@ function TripDetail({
                 onClick={() => onReach(trip)}
                 style={{ marginTop: 8 }}
               >
-                Mark as Reached
+                {t("trip.markReached", undefined, "Mark as Reached")}
               </button>
               <button
                 className="button primary wide"
@@ -3460,7 +3506,7 @@ function TripDetail({
                 style={{ marginTop: 8 }}
               >
                 <Plus size={16} style={{ display: "inline", marginRight: 6 }} />{" "}
-                Extra expense request
+                {t("trip.addExtra", undefined, "Extra expense request")}
               </button>
             </div>
           )}
@@ -3468,14 +3514,14 @@ function TripDetail({
         {/* Driver: reached — mark delivered */}
         {role === "Driver" && trip.status === "REACHED" && (
           <div className="panel action-panel">
-            <h2>Delivery Confirmation</h2>
-            <p>Confirm delivery to the customer.</p>
+            <h2>{t("statuses.REACHED")}</h2>
+            <p>{t("driverWorkflow.step5Desc")}</p>
             <button
               className="button primary wide"
               onClick={() => onMarkDelivered(trip)}
               style={{ marginTop: 12 }}
             >
-              Mark as Delivered
+              {t("trip.markReached", undefined, "Mark as Delivered")}
             </button>
           </div>
         )}
@@ -3483,10 +3529,9 @@ function TripDetail({
         {/* Driver: delivered — submit stamped docs */}
         {role === "Driver" && trip.status === "DELIVERED" && (
           <div className="panel action-panel">
-            <h2>Submit Stamped Documents</h2>
+            <h2>{t("driverWorkflow.step6Title")}</h2>
             <p>
-              Upload the final stamped documents to submit for Operations
-              review.
+              {t("driverWorkflow.step6Desc")}
             </p>
             <button
               className="button primary wide"
@@ -3497,7 +3542,7 @@ function TripDetail({
                 size={16}
                 style={{ display: "inline", marginRight: 6 }}
               />{" "}
-              Upload Stamped Document
+              {t("modals.docModal.stamped", undefined, "Upload Stamped Document")}
             </button>
           </div>
         )}
@@ -3506,7 +3551,7 @@ function TripDetail({
         {(role === "Operations" || role === "Super Admin") &&
           trip.status === "DOCUMENTS_SUBMITTED" && (
             <div className="panel action-panel">
-              <h2>Verify Documents</h2>
+              <h2>{t("modals.docPreview.title")}</h2>
               <p
                 style={{
                   fontSize: 12,
@@ -3514,8 +3559,7 @@ function TripDetail({
                   marginBottom: 12,
                 }}
               >
-                Review each submitted document independently above before
-                completing.
+                {t("driverWorkflow.pendingVerification")}
               </p>
 
               {(() => {
@@ -3545,13 +3589,13 @@ function TripDetail({
                           marginBottom: 6,
                         }}
                       >
-                        <span>Verification Progress</span>
+                        <span>{t("trip.documents")}</span>
                         <span
                           style={{
                             color: allVerified ? "#15803d" : "var(--blue)",
                           }}
                         >
-                          {verifiedDocs} of {totalDocs} verified
+                          {verifiedDocs} {t("common.of", undefined, "of")} {totalDocs} {t("common.verified", undefined, "verified")}
                         </span>
                       </div>
                       <div
@@ -3585,9 +3629,7 @@ function TripDetail({
                         size={16}
                         style={{ display: "inline", marginRight: 6 }}
                       />
-                      {allVerified
-                        ? "Complete Trip (All Verified)"
-                        : "Verify & Complete Trip"}
+                      {t("trip.completeTrip", undefined, "Complete Trip")}
                     </button>
                   </>
                 );
@@ -3605,19 +3647,19 @@ function TripDetail({
             onToggleVerify={
               onToggleVerifyDoc
                 ? () => {
-                    onToggleVerifyDoc(trip.id, previewDoc.id);
-                    setPreviewDoc((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            status:
-                              prev.status === "verified"
-                                ? "uploaded"
-                                : "verified",
-                          }
-                        : null,
-                    );
-                  }
+                  onToggleVerifyDoc(trip.id, previewDoc.id);
+                  setPreviewDoc((prev) =>
+                    prev
+                      ? {
+                        ...prev,
+                        status:
+                          prev.status === "verified"
+                            ? "uploaded"
+                            : "verified",
+                      }
+                      : null,
+                  );
+                }
                 : undefined
             }
           />
@@ -3634,6 +3676,7 @@ function InfoSection({
   title: string;
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <h2 className="activity-title section-title">{title}</h2>
@@ -3642,6 +3685,7 @@ function InfoSection({
   );
 }
 function Empty({ label }: { label: string }) {
+  const { t } = useTranslation();
   return <div className="empty">{label}</div>;
 }
 function Modal({
@@ -3653,6 +3697,7 @@ function Modal({
   children: React.ReactNode;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="modal-backdrop">
       <div className="modal">
@@ -3686,6 +3731,7 @@ function FilterModal({
   }[];
   onClearAll?: () => void;
 }) {
+  const { t } = useTranslation();
   if (!isOpen) return null;
 
   return (
@@ -3878,6 +3924,7 @@ function fromDatetimeLocal(value: string): { date: string; time: string } {
   };
 }
 function Info({ label, value }: { label: string; value: string }) {
+  const { t } = useTranslation();
   return (
     <div>
       <small>{label}</small>
@@ -3890,65 +3937,70 @@ function Info({ label, value }: { label: string; value: string }) {
 
 function EditModal({
   entity,
-  drivers,
-  vehicles,
   role,
+  drivers = [],
+  vehicles = [],
   onClose,
   onSave,
 }: {
   entity: Trip;
-  drivers: Driver[];
-  vehicles: Vehicle[];
   role: Role;
+  drivers?: Driver[];
+  vehicles?: Vehicle[];
   onClose: () => void;
   onSave: (data: Partial<Trip>) => void;
 }) {
+  const { t, language } = useTranslation();
   const [reference, setReference] = useState(entity.reference);
   const [customer, setCustomer] = useState(entity.customer);
   const [origin, setOrigin] = useState(entity.origin);
   const [destination, setDestination] = useState(entity.destination);
   const [pickupDT, setPickupDT] = useState(
-    toDatetimeLocal(entity.date, entity.time),
+    toDatetimeLocal(entity.pickupDate || entity.date, entity.pickupTime || entity.time)
   );
   const [deliveryDT, setDeliveryDT] = useState(
     toDatetimeLocal(
       entity.requestedDeliveryDate || entity.date,
-      entity.requestedDeliveryTime || entity.time,
-    ),
+      entity.requestedDeliveryTime || entity.time
+    )
   );
   const [cargoMaterial, setCargoMaterial] = useState(
-    entity.cargoMaterial || "Cement",
+    entity.cargo?.material || entity.cargoMaterial || "Cement"
   );
-  const [cargoWeight, setCargoWeight] = useState(entity.cargoWeight || "");
+  const [cargoWeight, setCargoWeight] = useState(
+    entity.cargo?.quantity || entity.cargoWeight || ""
+  );
   const [cargoType, setCargoType] = useState<Trip["cargoType"]>(
-    entity.cargoType || "Bagged",
+    entity.cargo?.loadType || entity.cargoType || "Bagged"
   );
-  const [noOfBags, setNoOfBags] = useState(entity.noOfBags || "");
+  const [noOfBags, setNoOfBags] = useState(
+    entity.cargo?.noOfBags || entity.noOfBags || ""
+  );
+
   const [selectedDriverId, setSelectedDriverId] = useState(
-    entity.driverNumber ?? "",
+    () => drivers.find((d) => d.name === entity.driver)?.id ?? ""
   );
-  const selectedDriver =
-    role !== "Coordinator"
-      ? (drivers.find((d) => d.id === selectedDriverId) ?? null)
-      : null;
-  const selectedVehicle = selectedDriver
-    ? (vehicles.find((v) => v.truck_id === selectedDriver.truck_id) ?? null)
-    : null;
+  const selectedDriver = drivers.find((d) => d.id === selectedDriverId);
+  const selectedVehicle = vehicles.find(
+    (v) => v.truck_id === selectedDriver?.vehicleId
+  );
 
   return (
-    <Modal title="Edit trip" onClose={onClose}>
+    <Modal title={t("trip.editTrip")} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          const { date, time } = fromDatetimeLocal(pickupDT);
+          const { date: pDate, time: pTime } = fromDatetimeLocal(pickupDT);
           const { date: dDate, time: dTime } = fromDatetimeLocal(deliveryDT);
           onSave({
             reference,
             customer,
             origin,
             destination,
-            date,
-            time,
+            date: pDate,
+            time: pTime,
+            pickupDate: pDate,
+            pickupTime: pTime,
             requestedDeliveryDate: dDate,
             requestedDeliveryTime: dTime,
             cargoMaterial,
@@ -3964,14 +4016,14 @@ function EditModal({
         }}
       >
         <label>
-          Reference
+          {t("trip.reference")}
           <input
             value={reference}
             onChange={(e) => setReference(e.target.value)}
           />
         </label>
         <label>
-          Customer
+          {t("trip.client")}
           <input
             value={customer}
             onChange={(e) => setCustomer(e.target.value)}
@@ -3979,11 +4031,11 @@ function EditModal({
         </label>
         <div className="form-row">
           <label>
-            Pickup
+            {t("trip.source")}
             <input value={origin} onChange={(e) => setOrigin(e.target.value)} />
           </label>
           <label>
-            Drop-off
+            {t("trip.destination")}
             <input
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
@@ -3991,7 +4043,7 @@ function EditModal({
           </label>
         </div>
         <label>
-          Pickup date &amp; time
+          {t("trip.pickupDateTime")}
           <input
             type="datetime-local"
             value={pickupDT}
@@ -3999,7 +4051,7 @@ function EditModal({
           />
         </label>
         <label>
-          Delivery date &amp; time
+          {t("trip.deliveryDateTime")}
           <input
             type="datetime-local"
             value={deliveryDT}
@@ -4007,7 +4059,7 @@ function EditModal({
           />
         </label>
         <label>
-          Material
+          {t("trip.cargoMaterial")}
           <input
             value={cargoMaterial}
             onChange={(e) => setCargoMaterial(e.target.value)}
@@ -4015,7 +4067,7 @@ function EditModal({
         </label>
         <div className="form-row">
           <label>
-            Cargo weight
+            {t("trip.cargoWeight")}
             <input
               value={cargoWeight}
               onChange={(e) => setCargoWeight(e.target.value)}
@@ -4023,20 +4075,20 @@ function EditModal({
             />
           </label>
           <label>
-            Cargo type
+            {t("trip.cargoType")}
             <select
               value={cargoType}
               onChange={(e) =>
                 setCargoType(e.target.value as Trip["cargoType"])
               }
             >
-              <option value="Bagged">Bagged</option>
-              <option value="Loose">Loose</option>
+              <option value="Bagged">{t("trip.bagged")}</option>
+              <option value="Loose">{t("trip.loose")}</option>
             </select>
           </label>
         </div>
         <label>
-          No. of bags
+          {t("trip.noOfBags")}
           <input
             value={noOfBags}
             onChange={(e) => setNoOfBags(e.target.value)}
@@ -4052,17 +4104,17 @@ function EditModal({
             }}
           >
             <label style={{ display: "block", marginBottom: 6 }}>
-              Assigned driver
+              {t("trip.driver")}
               <select
                 value={selectedDriverId}
                 onChange={(e) => setSelectedDriverId(e.target.value)}
                 style={{ marginTop: 6 }}
               >
-                <option value="">— Unassigned —</option>
+                <option value="">{t("common.unavailable", undefined, "— Unassigned —")}</option>
                 {drivers.map((d) => (
                   <option key={d.id} value={d.id}>
-                    {d.name} · {d.source_location} · {d.truck_id}
-                    {d.status === "unavailable" ? " (on trip)" : ""}
+                    {localizeName(d.name, language)} · {localizeName(d.source_location, language)} · {d.truck_id}
+                    {d.status === "unavailable" ? ` (${t("statuses.IN_TRANSIT", undefined, "on trip")})` : ""}
                   </option>
                 ))}
               </select>
@@ -4074,19 +4126,19 @@ function EditModal({
                   style={{ marginBottom: 10 }}
                 >
                   <Info
-                    label="Phone"
+                    label={t("common.phone", undefined, "Phone")}
                     value={String(selectedDriver.phone_number)}
                   />
                   <Info
-                    label="Base location"
-                    value={selectedDriver.source_location || "Not specified"}
+                    label={t("trip.source", undefined, "Base location")}
+                    value={localizeName(selectedDriver.source_location || "Not specified", language)}
                   />
                   <Info
-                    label="Status"
+                    label={t("common.status", undefined, "Status")}
                     value={
                       selectedDriver.status === "unavailable"
-                        ? "On trip"
-                        : "Available"
+                        ? t("statuses.IN_TRANSIT", undefined, "On trip")
+                        : t("common.available", undefined, "Available")
                     }
                   />
                 </div>
@@ -4102,7 +4154,7 @@ function EditModal({
                         margin: "10px 0 6px",
                       }}
                     >
-                      Truck
+                      {t("trip.truckDetails", undefined, "Truck")}
                     </p>
                     <div
                       style={{
@@ -4119,29 +4171,32 @@ function EditModal({
                           marginBottom: 8,
                         }}
                       >
-                        {selectedVehicle.brand} {selectedVehicle.model_name}
+                        {localizeName(selectedVehicle.brand, language)} {selectedVehicle.model_name}
                       </b>
                       <div className="info-grid compact-grid">
                         <Info
-                          label="Truck ID"
+                          label={t("trip.truckNumber", undefined, "Truck ID")}
                           value={selectedVehicle.truck_id}
                         />
-                        <Info label="Type" value={selectedVehicle.type} />
                         <Info
-                          label="Tyres"
+                          label={t("trip.truckType", undefined, "Type")}
+                          value={localizeName(selectedVehicle.type, language)}
+                        />
+                        <Info
+                          label={t("trip.tyreConfig", undefined, "Tyres")}
                           value={`${selectedVehicle.tires_count} tyres`}
                         />
                         <Info
-                          label="Capacity"
+                          label={t("trip.cargoWeight", undefined, "Capacity")}
                           value={selectedVehicle.load_capacity}
                         />
                         <Info
-                          label="Mileage"
+                          label={t("reports.mileage", undefined, "Mileage")}
                           value={`${selectedVehicle.mileage_kmpl} km/L`}
                         />
                         <Info
                           label="BS6"
-                          value={selectedVehicle.BS6 === "yes" ? "Yes" : "No"}
+                          value={selectedVehicle.BS6 === "yes" ? t("common.yes", undefined, "Yes") : t("common.no", undefined, "No")}
                         />
                       </div>
                     </div>
@@ -4213,6 +4268,7 @@ function AssignDriverModal({
   onClose: () => void;
   onConfirm: (driver?: Driver) => void;
 }) {
+  const { t, language } = useTranslation();
   const selectedClient = clients.find((c) => c.id === trip.clientId) ?? null;
   const selectedSource =
     selectedClient?.sources.find((s) => s.id === trip.sourceId) ?? null;
@@ -4224,8 +4280,8 @@ function AssignDriverModal({
         scoreDriverForSourceId(d, trip.sourceId) +
         scoreDriverForOrigin(d, trip.origin) +
         (trip.cargoCompany &&
-        d.source_company &&
-        normalizeLocation(trip.cargoCompany) ===
+          d.source_company &&
+          normalizeLocation(trip.cargoCompany) ===
           normalizeLocation(d.source_company)
           ? 2
           : 0),
@@ -4260,7 +4316,7 @@ function AssignDriverModal({
       <div className="modal" style={{ maxWidth: 460 }}>
         <div className="modal-header">
           <div>
-            <h2>Approve &amp; Assign Driver</h2>
+            <h2>{t("modals.assignDriver.title")}</h2>
           </div>
           <button onClick={onClose} aria-label="Close">
             <X size={18} />
@@ -4311,7 +4367,7 @@ function AssignDriverModal({
                       marginBottom: 2,
                     }}
                   >
-                    <b style={{ fontSize: 12 }}>{driver.name}</b>
+                    <b style={{ fontSize: 12 }}>{localizeName(driver.name, language)}</b>
                     {isSuggested && isAvailable && (
                       <span
                         style={{
@@ -4327,7 +4383,7 @@ function AssignDriverModal({
                           letterSpacing: ".05em",
                         }}
                       >
-                        Suggested
+                        {t("modals.assignDriver.bestMatch", undefined, "Suggested")}
                       </span>
                     )}
                     {isSelected && (
@@ -4341,7 +4397,7 @@ function AssignDriverModal({
                           letterSpacing: ".05em",
                         }}
                       >
-                        Selected
+                        {t("common.verified", undefined, "Selected")}
                       </span>
                     )}
                     {!isAvailable && (
@@ -4357,7 +4413,7 @@ function AssignDriverModal({
                           letterSpacing: ".05em",
                         }}
                       >
-                        On trip
+                        {t("statuses.IN_TRANSIT", undefined, "On trip")}
                       </span>
                     )}
                   </div>
@@ -4368,13 +4424,13 @@ function AssignDriverModal({
                       margin: 0,
                     }}
                   >
-                    {clients.find((c) => c.id === driver.clientId)?.name ??
-                      "Unknown client"}{" "}
+                    {localizeName(clients.find((c) => c.id === driver.clientId)?.name, language) ??
+                      "—"}{" "}
                     ·{" "}
-                    {clients
+                    {localizeName(clients
                       .find((c) => c.id === driver.clientId)
-                      ?.sources.find((s) => s.id === driver.sourceId)?.name ??
-                      "Unknown source"}
+                      ?.sources.find((s) => s.id === driver.sourceId)?.name, language) ??
+                      "—"}
                   </p>
                   <p
                     style={{
@@ -4405,7 +4461,7 @@ function AssignDriverModal({
                 padding: 16,
               }}
             >
-              No drivers found
+              {t("common.none", undefined, "No drivers found")}
             </p>
           )}
         </div>
@@ -4429,15 +4485,15 @@ function AssignDriverModal({
                 margin: "0 0 8px",
               }}
             >
-              Assigned truck
+              {t("trip.truckDetails")}
             </p>
             <b style={{ fontSize: 12, display: "block", marginBottom: 8 }}>
-              {selectedVehicle.brand} {selectedVehicle.model_name}
+              {localizeName(selectedVehicle.brand, language)} {selectedVehicle.model_name}
             </b>
             <div className="info-grid compact-grid">
-              <Info label="Truck ID" value={selectedVehicle.truck_id} />
-              <Info label="Type" value={selectedVehicle.type} />
-              <Info label="Capacity" value={selectedVehicle.load_capacity} />
+              <Info label={t("trip.truckNumber")} value={selectedVehicle.truck_id} />
+              <Info label={t("common.type", undefined, "Type")} value={localizeName(selectedVehicle.type, language)} />
+              <Info label={t("trip.cargoWeight")} value={selectedVehicle.load_capacity} />
             </div>
             {selectedDriverClient && selectedDriverSource && (
               <p
@@ -4447,7 +4503,7 @@ function AssignDriverModal({
                   margin: "10px 0 0",
                 }}
               >
-                {selectedDriverClient.name} · {selectedDriverSource.name}
+                {localizeName(selectedDriverClient.name, language)} · {localizeName(selectedDriverSource.name, language)}
               </p>
             )}
           </div>
@@ -4467,15 +4523,15 @@ function AssignDriverModal({
           >
             {selectedEntry
               ? canAssign
-                ? `Assign ${selectedEntry?.driver.name ?? ""} & Approve`
-                : "Selected driver is unavailable"
-              : "Select a driver to continue"}
+                ? `${t("trip.assignDriver")} (${localizeName(selectedEntry?.driver.name, language) ?? ""}) & ${t("approvals.approveBtn")}`
+                : t("common.unavailable", undefined, "Selected driver is unavailable")
+              : t("validation.driverRequired", undefined, "Select a driver to continue")}
           </button>
           <button
             className="button secondary wide"
             onClick={() => onConfirm(undefined)}
           >
-            Approve without driver
+            {t("approvals.approveBtn")}
           </button>
         </div>
       </div>
@@ -4514,6 +4570,7 @@ function CreateModal({
   onCreate: (t: Trip) => void;
   clients: Client[];
 }) {
+  const { t, language } = useTranslation();
   const [reference, setReference] = useState("");
   const [clientId, setClientId] = useState("");
   const [sourceId, setSourceId] = useState("");
@@ -4579,10 +4636,10 @@ function CreateModal({
   };
 
   return (
-    <Modal title="Create trip" onClose={onClose}>
+    <Modal title={t("trip.createTrip")} onClose={onClose}>
       <form onSubmit={submit}>
         <label>
-          Reference
+          {t("trip.reference")}
           <input
             value={reference}
             onChange={(e) => setReference(e.target.value)}
@@ -4590,7 +4647,7 @@ function CreateModal({
           />
         </label>
         <label>
-          Client
+          {t("trip.client")}
           <select
             value={clientId}
             onChange={(e) => {
@@ -4598,16 +4655,16 @@ function CreateModal({
               setSourceId("");
             }}
           >
-            <option value="">Select client</option>
+            <option value="">{t("trip.selectClient")}</option>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name}
+                {localizeName(c.name, language)}
               </option>
             ))}
           </select>
         </label>
         <label>
-          Source
+          {t("trip.source")}
           <select
             value={sourceId}
             onChange={(e) => {
@@ -4616,25 +4673,25 @@ function CreateModal({
             disabled={!selectedClient}
           >
             <option value="">
-              {selectedClient ? "Select source" : "Select client first"}
+              {selectedClient ? t("trip.source") : t("trip.selectClientFirst")}
             </option>
             {sourceOptions.map((source) => (
               <option key={source.id} value={source.id}>
-                {source.name}
+                {localizeName(source.name, language)}
               </option>
             ))}
           </select>
         </label>
         <label>
-          Destination
+          {t("trip.destination")}
           <input
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
-            placeholder="City or address"
+            placeholder={t("trip.cityOrAddress")}
           />
         </label>
         <label>
-          Pickup date &amp; time
+          {t("trip.pickupDateTime")}
           <input
             type="datetime-local"
             value={pickupDT}
@@ -4642,7 +4699,7 @@ function CreateModal({
           />
         </label>
         <label>
-          Delivery date &amp; time
+          {t("trip.deliveryDateTime")}
           <input
             type="datetime-local"
             value={deliveryDT}
@@ -4651,7 +4708,7 @@ function CreateModal({
         </label>
         <div className="form-row">
           <label>
-            Cargo weight
+            {t("trip.cargoWeight")}
             <input
               value={cargoWeight}
               onChange={(e) => setCargoWeight(e.target.value)}
@@ -4659,21 +4716,21 @@ function CreateModal({
             />
           </label>
           <label>
-            Cargo type
+            {t("trip.cargoType")}
             <select
               value={cargoType}
               onChange={(e) =>
                 setCargoType(e.target.value as Trip["cargoType"])
               }
             >
-              <option value="Bagged">Bagged</option>
-              <option value="Loose">Loose</option>
+              <option value="Bagged">{t("trip.bagged")}</option>
+              <option value="Loose">{t("trip.loose")}</option>
             </select>
           </label>
         </div>
         {cargoType === "Bagged" && (
           <label>
-            No. of bags
+            {t("trip.noOfBags")}
             <input
               value={noOfBags}
               onChange={(e) => setNoOfBags(e.target.value)}
@@ -4682,7 +4739,7 @@ function CreateModal({
           </label>
         )}
         <button className="button primary wide" type="submit">
-          Create trip
+          {t("trip.createTrip")}
         </button>
       </form>
     </Modal>
@@ -4696,16 +4753,17 @@ function ImportModal({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Modal title="Import trips" onClose={onClose}>
       <div className="upload">
         <UploadSimple size={24} style={{ color: "var(--blue)" }} />
-        <b>Drop your Excel file here</b>
-        <p>or choose a .xlsx file from your device</p>
-        <button className="button secondary">Choose file</button>
+        <b>{t("modals.importExcel.dragDrop")}</b>
+        <p>{t("modals.importExcel.supportedFormat")}</p>
+        <button className="button secondary">{t("common.select")}</button>
       </div>
       <div className="import-preview">
-        <b>Preview ready</b>
+        <b>{t("modals.importExcel.previewHeader")}</b>
         <span>2 valid trips · 0 errors</span>
       </div>
       <button className="button primary wide" onClick={onDone}>
@@ -4714,6 +4772,7 @@ function ImportModal({
     </Modal>
   );
 }
+
 function ExtraModal({
   onClose,
   onCreate,
@@ -4721,11 +4780,12 @@ function ExtraModal({
   onClose: () => void;
   onCreate: (x: Extra) => void;
 }) {
+  const { t } = useTranslation();
   const [type, setType] = useState<Extra["type"]>("Fuel");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   return (
-    <Modal title="Submit extra request" onClose={onClose}>
+    <Modal title={t("modals.extraModal.title")} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -4739,18 +4799,18 @@ function ExtraModal({
         }}
       >
         <label>
-          Request type
+          {t("modals.extraModal.typeLabel")}
           <select
             value={type}
             onChange={(e) => setType(e.target.value as Extra["type"])}
           >
-            <option>Fuel</option>
-            <option>Cash</option>
-            <option>AdBlue</option>
+            <option value="Fuel">{t("modals.extraModal.fuel")}</option>
+            <option value="Cash">{t("modals.extraModal.cash")}</option>
+            <option value="AdBlue">{t("modals.extraModal.adBlue")}</option>
           </select>
         </label>
         <label>
-          Amount
+          {t("modals.extraModal.amountLabel")}
           <input
             value={amount}
             onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
@@ -4759,7 +4819,7 @@ function ExtraModal({
           />
         </label>
         <label>
-          Note
+          {t("modals.extraModal.noteLabel")}
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -4768,12 +4828,13 @@ function ExtraModal({
           />
         </label>
         <button className="button primary wide" type="submit">
-          Submit request
+          {t("modals.extraModal.submitBtn")}
         </button>
       </form>
     </Modal>
   );
 }
+
 function DocumentModal({
   onClose,
   onCreate,
@@ -4783,11 +4844,12 @@ function DocumentModal({
   onCreate: (x: TripDocument) => void;
   isStamped?: boolean;
 }) {
+  const { t } = useTranslation();
   const [type, setType] = useState<TripDocument["type"]>("LR");
   const [name, setName] = useState("");
   return (
     <Modal
-      title={isStamped ? "Upload Stamped Document" : "Upload trip document"}
+      title={isStamped ? t("trip.stampedInvoice") : t("modals.docModal.title")}
       onClose={onClose}
     >
       <form
@@ -4804,35 +4866,33 @@ function DocumentModal({
         <div className="upload">
           <UploadSimple size={24} style={{ color: "var(--blue)" }} />
           <b>
-            {isStamped ? "Select the stamped document" : "Select a document"}
+            {isStamped ? t("trip.stampedInvoice") : t("modals.docModal.fileLabel")}
           </b>
-          <p>PDF, JPG, or PNG up to 10 MB</p>
+          <p>{t("modals.docModal.subtitle")}</p>
           <input
             type="file"
             onChange={(e) => setName(e.target.files?.[0]?.name || "")}
           />
         </div>
         <label>
-          Document type
+          {t("modals.docModal.typeLabel")}
           <select
             value={type}
             onChange={(e) => setType(e.target.value as TripDocument["type"])}
           >
-            <option>LR</option>
-            <option>WB</option>
-            <option>Invoice</option>
-            <option>Other</option>
+            <option value="LR">{t("trip.lrDoc")}</option>
+            <option value="WB">{t("trip.wbDoc")}</option>
+            <option value="Invoice">{t("trip.invoiceDoc")}</option>
+            <option value="Other">{t("modals.extraModal.other")}</option>
           </select>
         </label>
         <button className="button primary wide" type="submit">
-          {isStamped ? "Upload & Complete Trip" : "Upload document"}
+          {isStamped ? t("driverWorkflow.step6Title") : t("modals.docModal.uploadBtn")}
         </button>
       </form>
     </Modal>
   );
 }
-
-// ─── TripOpsReport ────────────────────────────────────────────────────────────
 
 function TripOpsReport({
   trips,
@@ -4843,6 +4903,7 @@ function TripOpsReport({
   onOpenTrip?: (trip: Trip) => void;
   onMetricClick?: (filter: string) => void;
 }) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string>("All");
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -4864,18 +4925,18 @@ function TripOpsReport({
       selectedFilter === "All"
         ? true
         : selectedFilter === "In progress" ||
-            selectedFilter === "In Transit"
+          selectedFilter === "In Transit"
           ? ["READY", "IN_TRANSIT", "ON_HOLD", "REACHED"].includes(r.status)
           : selectedFilter === "Completed" || selectedFilter === "Delivered"
             ? ["COMPLETED", "DELIVERED", "DOCUMENTS_SUBMITTED"].includes(
+              r.status,
+            )
+            : selectedFilter === "Scheduled" ||
+              selectedFilter === "Waiting for Driver" ||
+              selectedFilter === "Driver Accepted"
+              ? ["NEW", "DRIVER_PENDING", "DRIVER_ACCEPTED"].includes(
                 r.status,
               )
-            : selectedFilter === "Scheduled" ||
-                selectedFilter === "Waiting for Driver" ||
-                selectedFilter === "Driver Accepted"
-              ? ["NEW", "DRIVER_PENDING", "DRIVER_ACCEPTED"].includes(
-                  r.status,
-                )
               : selectedFilter === "Rejected"
                 ? ["REJECTED", "DRIVER_REJECTED"].includes(r.status)
                 : r.status === selectedFilter;
@@ -4911,12 +4972,12 @@ function TripOpsReport({
   };
 
   const tripFilterOptions = [
-    { id: "All", label: "All" },
-    { id: "Waiting for Driver", label: "Waiting for Driver" },
-    { id: "Driver Accepted", label: "Driver Accepted" },
-    { id: "In Transit", label: "In Transit" },
-    { id: "Delivered", label: "Delivered" },
-    { id: "Rejected", label: "Rejected" },
+    { id: "All", label: t("common.all", undefined, "All") },
+    { id: "Waiting for Driver", label: t("statuses.DRIVER_PENDING", undefined, "Waiting for Driver") },
+    { id: "Driver Accepted", label: t("statuses.DRIVER_ACCEPTED", undefined, "Driver Accepted") },
+    { id: "In Transit", label: t("statuses.IN_TRANSIT", undefined, "In Transit") },
+    { id: "Delivered", label: t("statuses.DELIVERED", undefined, "Delivered") },
+    { id: "Rejected", label: t("statuses.REJECTED", undefined, "Rejected") },
   ];
 
   return (
@@ -4924,10 +4985,10 @@ function TripOpsReport({
       <FilterModal
         isOpen={showFilterModal}
         onClose={() => setShowFilterModal(false)}
-        title="Filters"
+        title={t("common.filters", undefined, "Filters")}
         sections={[
           {
-            title: "TRIP STATUS",
+            title: t("trip.tripStatus", undefined, "TRIP STATUS"),
             options: tripFilterOptions,
             selected: selectedFilter,
             onSelect: (id) => setSelectedFilter(id),
@@ -4943,14 +5004,14 @@ function TripOpsReport({
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search trip ID, source, destination, driver..."
+              placeholder={t("trip.searchPlaceholder", undefined, "Search trip ID, source, destination, driver...")}
             />
           </div>
           <button
             className="button secondary compact"
             onClick={() => setShowFilterModal(true)}
-            title="Filters"
-            aria-label="Filters"
+            title={t("common.filters", undefined, "Filters")}
+            aria-label={t("common.filters", undefined, "Filters")}
             style={{ minWidth: 36, padding: "0 8px", position: "relative" }}
           >
             <FunnelSimple size={16} />
@@ -4975,7 +5036,15 @@ function TripOpsReport({
           <table style={{ width: "100%", fontSize: "0.875rem", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
-                {["Trip ID", "Source", "Destination", "Cargo", "Driver", "Status", "Est Delivery"].map((h) => (
+                {[
+                  t("reports.tripId", undefined, "Trip ID"),
+                  t("trip.source", undefined, "Source"),
+                  t("trip.destination", undefined, "Destination"),
+                  t("trip.cargo", undefined, "Cargo"),
+                  t("trip.driver", undefined, "Driver"),
+                  t("common.status", undefined, "Status"),
+                  t("trip.deliveryDate", undefined, "Est Delivery"),
+                ].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -5011,7 +5080,7 @@ function TripOpsReport({
                   <td style={{ padding: "0.75rem 1rem", color: "#475569" }}>{row.loadType} · {row.weight}</td>
                   <td style={{ padding: "0.75rem 1rem", color: "#475569" }}>{row.driver}</td>
                   <td style={{ padding: "0.75rem 1rem", whiteSpace: "nowrap" }}>
-                    <Status>{getStatusLabel(row.status)}</Status>
+                    <Status>{t(`statuses.${row.status}`, undefined, row.status)}</Status>
                   </td>
                   <td style={{ padding: "0.75rem 1rem", color: "#475569", whiteSpace: "nowrap" }}>{row.delivery}</td>
                 </tr>
@@ -5019,7 +5088,7 @@ function TripOpsReport({
               {!filteredRows.length && (
                 <tr>
                   <td colSpan={7} style={{ padding: "2rem", textAlign: "center", color: "#94a3b8" }}>
-                    No trips match the filters.
+                    {t("trip.noTripsFound", undefined, "No trips match the filters.")}
                   </td>
                 </tr>
               )}
@@ -5034,6 +5103,7 @@ function TripOpsReport({
 // ─── FuelExpenseReport ────────────────────────────────────────────────────────
 
 function FuelExpenseReport({ trips }: { trips: Trip[] }) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const dummyRows = [
     {
@@ -5173,7 +5243,7 @@ function FuelExpenseReport({ trips }: { trips: Trip[] }) {
         <div className="panel-header" style={{ alignItems: "center" }}>
           <div>
             <h2>Fuel &amp; Expense Breakdown</h2>
-            <p>Per-trip fuel and cash advance summary</p>
+            <p>{t("reports.fuelExpenseSubtitle")}</p>
           </div>
           <button
             className="icon-create"
@@ -5283,7 +5353,7 @@ function FuelExpenseReport({ trips }: { trips: Trip[] }) {
                         Yes
                       </span>
                     ) : (
-                      <span style={{ color: "#94a3b8" }}>No</span>
+                      <span style={{ color: "#94a3b8" }}>{t("common.no")}</span>
                     )}
                   </td>
                 </tr>
@@ -5309,8 +5379,8 @@ function FuelExpenseReport({ trips }: { trips: Trip[] }) {
       <div className="panel">
         <div className="panel-header">
           <div>
-            <h2>Fuel Authorized vs Recorded</h2>
-            <p>Planned vs actual consumption comparison</p>
+            <h2>{t("reports.fuelExpenseTitle")}</h2>
+            <p>{t("reports.fuelExpenseSubtitle")}</p>
           </div>
         </div>
         <div
@@ -5411,6 +5481,7 @@ function CashAdvancesPage({
   initialStatus?: string;
   onNavigateApprovals?: (type: "Fuel" | "Cash" | "AdBlue" | "All", status?: "Approved" | "All") => void;
 }) {
+  const { t } = useTranslation();
   const cashRecords = extras.filter((e) => e.type === "Cash");
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [query, setQuery] = useState("");
@@ -5427,17 +5498,17 @@ function CashAdvancesPage({
     <div className="panel">
       <div className="panel-header">
         <div>
-          <h2>Cash Advances Report</h2>
-          <p>Track trip cash advances and request approvals.</p>
+          <h2>{t("reports.cashAdvancesTitle")}</h2>
+          <p>{t("reports.cashAdvancesSubtitle")}</p>
         </div>
-        <button className="button secondary compact" onClick={() => onNavigateApprovals?.("Cash", "All")}>Open Approvals</button>
+        <button className="button secondary compact" onClick={() => onNavigateApprovals?.("Cash", "All")}>{t("nav.approvals")}</button>
       </div>
       <div className="filters">
         <div className="search"><MagnifyingGlass size={16} style={{ color: "#9ca6b4", marginRight: 4 }} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search trip, driver, reason..." /></div>
       </div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead><tr>{["Trip ID","Driver","Truck","Req Amt","Reason","Req Date","Appr Date","Status"].map((h)=><th key={h} style={{ textAlign: "left", padding: "0.75rem 1rem", fontSize: "0.75rem" }}>{h}</th>)}</tr></thead>
+          <thead><tr>{["Trip ID", "Driver", "Truck", "Req Amt", "Reason", "Req Date", "Appr Date", "Status"].map((h) => <th key={h} style={{ textAlign: "left", padding: "0.75rem 1rem", fontSize: "0.75rem" }}>{h}</th>)}</tr></thead>
           <tbody>
             {filtered.map((row) => {
               const trip = trips.find((t) => t.id === row.tripId);
@@ -5474,6 +5545,7 @@ function FuelReportsPage({
   initialStatus?: string;
   onNavigateApprovals?: (type: "Fuel" | "Cash" | "AdBlue" | "All", status?: "Approved" | "All") => void;
 }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<"basic" | "extra">(initialTab);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   useEffect(() => setTab(initialTab), [initialTab]);
@@ -5482,12 +5554,12 @@ function FuelReportsPage({
   return (
     <div className="panel">
       <div className="panel-header">
-        <div><h2>Fuel &amp; Extra Fuel Reports</h2><p>Review basic fuel and extra requests.</p></div>
-        <button className="button secondary compact" onClick={() => onNavigateApprovals?.("Fuel", "All")}>Open Approvals</button>
+        <div><h2>{t("nav.fuelReports")}</h2><p>{t("reports.fuelExpenseSubtitle")}</p></div>
+        <button className="button secondary compact" onClick={() => onNavigateApprovals?.("Fuel", "All")}>{t("nav.approvals")}</button>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <button className={tab === "basic" ? "filter active" : "filter"} onClick={() => setTab("basic")}>Basic Fuel</button>
-        <button className={tab === "extra" ? "filter active" : "filter"} onClick={() => setTab("extra")}>Extra Fuel</button>
+        <button className={tab === "basic" ? "filter active" : "filter"} onClick={() => setTab("basic")}>{t("fuel.title")}</button>
+        <button className={tab === "extra" ? "filter active" : "filter"} onClick={() => setTab("extra")}>{t("modals.extraModal.title")}</button>
       </div>
       {tab === "extra" && <div style={{ fontSize: 13, color: "var(--muted-ink)" }}>Extra fuel requests count: {extraFuelRows.length} | filter: {statusFilter}</div>}
     </div>
@@ -5511,18 +5583,19 @@ function ApprovalsHub({
   onOpenTrip?: (tripId: string) => void;
   onNavigateReports?: (reportView: "reports-fuel" | "reports-cash" | "reports-ops", tab?: "basic" | "extra", status?: string) => void;
 }) {
+  const { t } = useTranslation();
   const pendingList = extras.filter((x) => x.status === "Submitted");
   return (
     <div className="panel">
-      <div className="panel-header"><div><h2>Super Admin Approvals</h2><p>Approve or reject extra requests.</p></div></div>
+      <div className="panel-header"><div><h2>{t("approvals.title")}</h2><p>{t("approvals.subtitle")}</p></div></div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {pendingList.map((item) => (
           <div key={item.id} style={{ border: "1px solid var(--line)", borderRadius: 12, padding: 16 }}>
             <b>{item.tripRef || trips.find((t) => t.id === item.tripId)?.reference || "—"}</b>
             <div style={{ marginTop: 6 }}>{item.type} · {item.amount}</div>
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <button className="button primary compact" onClick={() => onApprove(item.id)}>Accept</button>
-              <button className="button danger compact" onClick={() => onReject(item.id)}>Reject</button>
+              <button className="button primary compact" onClick={() => onApprove(item.id)}>{t("approvals.approveBtn")}</button>
+              <button className="button danger compact" onClick={() => onReject(item.id)}>{t("approvals.rejectBtn")}</button>
             </div>
           </div>
         ))}
@@ -5553,6 +5626,7 @@ function FollowupsPage({
   onCreate: () => void;
   view?: string;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [tripFilter, setTripFilter] = useState(defaultTripFilter || "All");
@@ -5629,8 +5703,8 @@ function FollowupsPage({
     <section className="panel list-panel">
       <div className="panel-header">
         <div>
-          <h2>Follow-ups</h2>
-          <p>Field communication and driver follow-up log.</p>
+          <h2>{t("followups.title")}</h2>
+          <p>{t("followups.subtitle")}</p>
         </div>
         <div className="panel-header-actions">
           <button
@@ -5655,13 +5729,13 @@ function FollowupsPage({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search driver, trip, note"
+            placeholder={t("trip.searchPlaceholder", undefined, "Search driver, trip, note")}
           />
         </div>
         <button
           className="icon-create"
-          title="Filter"
-          aria-label="Filter"
+          title={t("common.filter", undefined, "Filter")}
+          aria-label={t("common.filter", undefined, "Filter")}
           onClick={() => setShowFilters((v) => !v)}
           style={{ position: "relative" }}
         >
@@ -5727,7 +5801,7 @@ function FollowupsPage({
                 letterSpacing: ".07em",
               }}
             >
-              Trip
+              {t("nav.trips", undefined, "Trip")}
             </p>
             <div
               style={{
@@ -5737,14 +5811,14 @@ function FollowupsPage({
                 marginBottom: 12,
               }}
             >
-              {tripOptions.map((t) => (
+              {tripOptions.map((opt) => (
                 <button
-                  key={t}
-                  className={tripFilter === t ? "filter active" : "filter"}
+                  key={opt}
+                  className={tripFilter === opt ? "filter active" : "filter"}
                   style={{ fontSize: 10 }}
-                  onClick={() => setTripFilter(t)}
+                  onClick={() => setTripFilter(opt)}
                 >
-                  {t}
+                  {opt === "All" ? t("common.all", undefined, "All") : opt}
                 </button>
               ))}
             </div>
@@ -5758,7 +5832,7 @@ function FollowupsPage({
                 letterSpacing: ".07em",
               }}
             >
-              Status
+              {t("common.status", undefined, "Status")}
             </p>
             <div style={{ display: "flex", gap: 4 }}>
               {["All", "Open", "Done"].map((s) => (
@@ -5768,7 +5842,7 @@ function FollowupsPage({
                   style={{ fontSize: 10 }}
                   onClick={() => setStatusFilter(s)}
                 >
-                  {s}
+                  {t(s === "All" ? "common.all" : s === "Open" ? "statuses.Open" : "statuses.Done", undefined, s)}
                 </button>
               ))}
             </div>
@@ -5806,7 +5880,7 @@ function FollowupsPage({
                 className={`status ${fu.status.toLowerCase()}`}
                 style={{ fontSize: 9 }}
               >
-                {fu.status}
+                {t(`statuses.${fu.status}`, undefined, fu.status)}
               </span>
             </div>
             <p
@@ -5827,7 +5901,7 @@ function FollowupsPage({
                 marginTop: 4,
               }}
             >
-              Due {fu.dueDate} · {to12Hour(fu.dueTime)}
+              {t("followups.dueDate", undefined, "Due")} {fu.dueDate} · {to12Hour(fu.dueTime)}
             </small>
           </div>
           <a
@@ -5841,11 +5915,11 @@ function FollowupsPage({
             aria-label={`Call ${fu.driver}`}
             title={`Call ${fu.driver}`}
           >
-            <span style={{ fontSize: 14 }}>📞</span> Call
+            <span style={{ fontSize: 14 }}>📞</span> {t("driverWorkflow.callCoordinator", undefined, "Call").split(" ")[0]}
           </a>
         </div>
       ))}
-      {!filtered.length && <Empty label="No follow-ups match" />}
+      {!filtered.length && <Empty label={t("followups.noFollowupsTitle", undefined, "No follow-ups match")} />}
     </section>
   );
 }
@@ -5859,13 +5933,14 @@ function FollowupModal({
   onClose: () => void;
   onCreate: (data: Omit<Followup, "id" | "createdAt" | "status">) => void;
 }) {
+  const { t, language } = useTranslation();
   const activeTripOptions = trips.filter((t) => t.status !== "COMPLETED");
   const [tripId, setTripId] = useState(activeTripOptions[0]?.id || "");
   const selectedTrip = trips.find((t) => t.id === tripId);
   const [note, setNote] = useState("");
   const [dueDT, setDueDT] = useState("");
   return (
-    <Modal title="Create follow-up" onClose={onClose}>
+    <Modal title={t("followups.scheduleBtn", undefined, "Create follow-up")} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -5883,15 +5958,15 @@ function FollowupModal({
         }}
       >
         <label>
-          Trip
+          {t("nav.trips", undefined, "Trip")}
           <select value={tripId} onChange={(e) => setTripId(e.target.value)}>
-            {activeTripOptions.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.reference} — {t.customer}
+            {activeTripOptions.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.reference} — {localizeName(opt.customer, language)}
               </option>
             ))}
             {!activeTripOptions.length && (
-              <option value="">No active trips</option>
+              <option value="">{t("trip.noTripsFound")}</option>
             )}
           </select>
         </label>
@@ -5905,12 +5980,12 @@ function FollowupModal({
               color: "var(--blue)",
             }}
           >
-            <b>{selectedTrip.driver || "Unassigned"}</b> ·{" "}
+            <b>{localizeName(selectedTrip.driver || "Unassigned", language)}</b> ·{" "}
             {selectedTrip.driverNumber || "No phone on file"}
           </div>
         )}
         <label>
-          Note
+          {t("modals.extraModal.noteLabel")}
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -5919,7 +5994,7 @@ function FollowupModal({
           />
         </label>
         <label>
-          Due date &amp; time
+          {t("followups.dueDate", undefined, "Due date")} &amp; {t("followups.dueTime", undefined, "time")}
           <input
             type="datetime-local"
             value={dueDT}
@@ -5927,7 +6002,7 @@ function FollowupModal({
           />
         </label>
         <button className="button primary wide" type="submit">
-          Create follow-up
+          {t("followups.scheduleBtn", undefined, "Create follow-up")}
         </button>
       </form>
     </Modal>
@@ -5947,6 +6022,7 @@ function FuelTransactionsPage({
   view?: string;
   defaultStatusFilter?: string;
 }) {
+  const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -6015,7 +6091,7 @@ function FuelTransactionsPage({
       <div className="panel-header" style={{ marginBottom: 12 }}>
         <div>
           <p style={{ margin: 0, fontSize: 13, color: "var(--muted-ink)" }}>
-            Dispatch fuel authorisations to pump stations.
+            {t("fuel.subtitle", undefined, "Dispatch fuel authorisations to pump stations.")}
           </p>
         </div>
       </div>
@@ -6037,15 +6113,15 @@ function FuelTransactionsPage({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search trip, driver, station"
+            placeholder={t("fuel.searchPlaceholder", undefined, "Search trip, driver, station")}
             style={{ width: "100%", minWidth: 0 }}
           />
         </div>
         <div style={{ position: "relative", flexShrink: 0 }}>
           <button
             className="icon-create"
-            aria-label="Open filters"
-            title="Filters"
+            aria-label={t("common.filters", undefined, "Filters")}
+            title={t("common.filters", undefined, "Filters")}
             onClick={() =>
               showFilters ? setShowFilters(false) : openFilters()
             }
@@ -6088,7 +6164,7 @@ function FuelTransactionsPage({
               />
               <div
                 role="dialog"
-                aria-label="Fuel transaction filters"
+                aria-label={t("fuel.title", undefined, "Filter Transactions")}
                 style={{
                   position: "fixed",
                   left: 0,
@@ -6126,7 +6202,7 @@ function FuelTransactionsPage({
                 >
                   <div>
                     <b style={{ fontSize: 17, color: "var(--ink)" }}>
-                      Filter Transactions
+                      {t("fuel.title", undefined, "Filter Transactions")}
                     </b>
                     {activeFilters > 0 && (
                       <span
@@ -6136,7 +6212,7 @@ function FuelTransactionsPage({
                           marginLeft: 8,
                         }}
                       >
-                        ({activeFilters} active)
+                        ({activeFilters} {t("common.active", undefined, "active")})
                       </span>
                     )}
                   </div>
@@ -6153,12 +6229,12 @@ function FuelTransactionsPage({
                       }}
                       onClick={clearAllFilters}
                     >
-                      Reset All
+                      {t("common.reset", undefined, "Reset All")}
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowFilters(false)}
-                      aria-label="Close filters"
+                      aria-label={t("common.close", undefined, "Close filters")}
                       style={{
                         background: "var(--line-light, #f1f5f9)",
                         border: "none",
@@ -6197,7 +6273,7 @@ function FuelTransactionsPage({
                         letterSpacing: ".08em",
                       }}
                     >
-                      Status
+                      {t("common.status", undefined, "Status")}
                     </p>
                     <div
                       style={{
@@ -6232,7 +6308,7 @@ function FuelTransactionsPage({
                               textAlign: "left",
                             }}
                           >
-                            <span>{f}</span>
+                            <span>{t(f === "All" ? "common.all" : `statuses.${f}`, undefined, f)}</span>
                             {isSelected && (
                               <CheckCircle
                                 size={15}
@@ -6256,7 +6332,7 @@ function FuelTransactionsPage({
                         letterSpacing: ".08em",
                       }}
                     >
-                      Date Range
+                      {t("reports.dateRange", undefined, "Date Range")}
                     </p>
                     <DateRangeFilter
                       dateFrom={draftDateFrom}
@@ -6288,7 +6364,7 @@ function FuelTransactionsPage({
                     onClick={clearAllFilters}
                     type="button"
                   >
-                    Clear All
+                    {t("common.clearAll", undefined, "Clear All")}
                   </button>
                   <button
                     className="button primary"
@@ -6302,7 +6378,7 @@ function FuelTransactionsPage({
                     onClick={applyFilters}
                     type="button"
                   >
-                    Apply Filters
+                    {t("common.applyFilters", undefined, "Apply Filters")}
                   </button>
                 </div>
               </div>
@@ -6414,7 +6490,7 @@ function FuelTransactionsPage({
                     fontWeight: 600,
                   }}
                 >
-                  {tx.status}
+                  {t(`statuses.${tx.status}`, undefined, tx.status)}
                 </span>
                 <div
                   style={{
@@ -6434,7 +6510,7 @@ function FuelTransactionsPage({
                 style={{ fontSize: 13, padding: "8px 16px", borderRadius: 8 }}
                 onClick={() => onSendToPump(tx)}
               >
-                Send to pump
+                {t("fuel.sendToPump", undefined, "Send to pump")}
               </button>
             )}
             {(tx.status === "Sent" || tx.status === "Resent") && (
@@ -6443,14 +6519,14 @@ function FuelTransactionsPage({
                 style={{ fontSize: 13, padding: "8px 16px", borderRadius: 8 }}
                 onClick={() => onResend(tx)}
               >
-                Resend
+                {t("fuel.resendToPump", undefined, "Resend")}
               </button>
             )}
           </div>
         ))}
       </div>
 
-      {!filtered.length && <Empty label="No fuel transactions found" />}
+      {!filtered.length && <Empty label={t("fuel.noFuelTitle", undefined, "No fuel transactions found")} />}
     </section>
   );
 }
@@ -6470,7 +6546,8 @@ function DriverOverviewSection({
   onRejectTrip: (t: Trip) => void;
   onResumeFlow: (t: Trip) => void;
 }) {
-  const driverPendingTrips = trips.filter((t) => t.status === "DRIVER_PENDING");
+  const { t, language } = useTranslation();
+  const driverPendingTrips = trips.filter((item) => item.status === "DRIVER_PENDING");
   if (driverPendingTrips.length === 0) return null;
 
   return (
@@ -6490,32 +6567,32 @@ function DriverOverviewSection({
         >
           <div>
             <b style={{ fontSize: 14, color: "var(--blue)", display: "block" }}>
-              Active Trip Journey in Progress
+              {t("driverWorkflow.title")}
             </b>
             <span style={{ fontSize: 12, color: "var(--muted-ink)" }}>
-              You have an active trip workflow in progress.
+              {t("driverWorkflow.subtitle")}
             </span>
           </div>
           <button
             className="button primary"
             onClick={() => {
               const activeTrip = trips.find(
-                (t) => t.id === activeDriverFlow.tripId,
+                (item) => item.id === activeDriverFlow.tripId,
               );
               if (activeTrip) onResumeFlow(activeTrip);
             }}
           >
-            Resume Active Trip Flow →
+            {t("driverWorkflow.subtitle")} →
           </button>
         </div>
       )}
 
       <div className="panel" style={{ padding: 20 }}>
-        <h2 style={{ fontSize: 16, marginBottom: 16 }}>Pending Requests</h2>
+        <h2 style={{ fontSize: 16, marginBottom: 16 }}>{t("approvals.pendingReview")}</h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {driverPendingTrips.map((t) => (
+          {driverPendingTrips.map((item) => (
             <div
-              key={t.id}
+              key={item.id}
               style={{
                 border: "1px solid var(--line)",
                 borderRadius: 8,
@@ -6534,24 +6611,24 @@ function DriverOverviewSection({
                 }}
               >
                 <div>
-                  <b style={{ fontSize: 14, marginRight: 8 }}>{t.reference}</b>
+                  <b style={{ fontSize: 14, marginRight: 8 }}>{item.reference}</b>
                   <span style={{ fontSize: 12, color: "var(--muted-ink)" }}>
-                    {t.customer}
+                    {localizeName(item.customer, language)}
                   </span>
                 </div>
-                <StatusBadge status={t.status} />
+                <StatusBadge status={item.status} />
               </div>
 
               <div style={{ fontSize: 12, color: "var(--ink)" }}>
                 <div>
-                  <b>Pickup:</b> {t.origin} ({t.date} · {t.time})
+                  <b>{t("trip.source")}:</b> {localizeName(item.origin, language)} ({item.date} · {item.time})
                 </div>
                 <div>
-                  <b>Drop-off:</b> {t.destination}
+                  <b>{t("trip.destination")}:</b> {localizeName(item.destination, language)}
                 </div>
                 <div>
-                  <b>Cargo:</b> {t.cargoMaterial || "Cement"} (
-                  {t.cargoWeight || "28 tons"})
+                  <b>{t("trip.cargo")}:</b> {localizeName(item.cargoMaterial || "Cement", language)} (
+                  {item.cargoWeight || "28 tons"})
                 </div>
               </div>
 
@@ -6559,18 +6636,18 @@ function DriverOverviewSection({
                 <button
                   type="button"
                   className="button primary wide"
-                  onClick={() => onAcceptTrip(t)}
+                  onClick={() => onAcceptTrip(item)}
                   style={{ padding: "8px 14px", fontSize: 12 }}
                 >
-                  Accept Trip
+                  {t("trip.acceptTrip")}
                 </button>
                 <button
                   type="button"
                   className="button danger wide"
-                  onClick={() => onRejectTrip(t)}
+                  onClick={() => onRejectTrip(item)}
                   style={{ padding: "8px 14px", fontSize: 12 }}
                 >
-                  Reject Trip
+                  {t("trip.rejectTrip")}
                 </button>
               </div>
             </div>
@@ -6611,6 +6688,7 @@ function DriverWorkflow({
   onSubmitStampedDocs: (docs: TripDocument[]) => void;
   onCompleteFlow: () => void;
 }) {
+  const { t, language } = useTranslation();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState("");
 
@@ -6681,9 +6759,10 @@ function DriverWorkflow({
     setShowExtraModal(false);
   };
 
-  const currentStep = flowState.step;
   const stepperRef = useRef<HTMLDivElement | null>(null);
-  const stepRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const currentStep = flowState.step;
   const initialDocTypes = ["LR", "WB", "Invoice"];
   const stampedDocTypes = ["LR (stamped)", "WB (stamped)", "Invoice (stamped)"];
   const hasVerifiedDocs = (types: string[]) =>
@@ -6696,20 +6775,21 @@ function DriverWorkflow({
   const stampedDocsVerified = hasVerifiedDocs(stampedDocTypes);
 
   useEffect(() => {
-    const activeIndex = currentStep - 1;
-    const activeStepEl = stepRefs.current[activeIndex];
-    if (activeStepEl) {
-      activeStepEl.scrollIntoView({
-        behavior: "smooth",
-        inline: "center",
-        block: "nearest",
-      });
+    if (currentStep >= 1 && currentStep <= 8) {
+      const el = stepRefs.current[currentStep - 1];
+      if (el && stepperRef.current) {
+        el.scrollIntoView({
+          behavior: "smooth",
+          inline: "center",
+          block: "nearest",
+        });
+      }
     }
   }, [currentStep]);
 
   const getTimeString = () => {
-    const now = new Date();
-    return `${now.getDate()} ${now.toLocaleString("en-GB", { month: "short" })} ${now.getFullYear()} · ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, "0")} ${now.getHours() >= 12 ? "PM" : "AM"}`;
+    const d = new Date();
+    return `${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} · ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`;
   };
 
   const handleStep1Submit = (e: React.FormEvent) => {
@@ -6811,7 +6891,8 @@ function DriverWorkflow({
       return;
     }
     setValidationError("");
-    const fileName = selectedFile?.name || `Stamped_LR_${trip.reference}.jpg`;
+    const fileName =
+      selectedFile?.name || `Stamped_LR_${trip.reference}.jpg`;
     onAddDocument({
       id: `doc-${Date.now()}-6`,
       name: fileName,
@@ -6835,7 +6916,8 @@ function DriverWorkflow({
       return;
     }
     setValidationError("");
-    const fileName = selectedFile?.name || `Stamped_WB_${trip.reference}.jpg`;
+    const fileName =
+      selectedFile?.name || `Stamped_WB_${trip.reference}.jpg`;
     onAddDocument({
       id: `doc-${Date.now()}-7`,
       name: fileName,
@@ -6880,14 +6962,14 @@ function DriverWorkflow({
   };
 
   const STEPS = [
-    { num: 1, label: "Upload LR" },
-    { num: 2, label: "Upload WB" },
-    { num: 3, label: "Upload Invoice" },
-    { num: 4, label: "Start Trip" },
-    { num: 5, label: "In Transit" },
-    { num: 6, label: "Upload Stamped LR" },
-    { num: 7, label: "Upload Stamped WB" },
-    { num: 8, label: "Upload Stamped Invoice" },
+    { num: 1, label: t("driverWorkflow.step1Title", undefined, "Upload LR") },
+    { num: 2, label: t("driverWorkflow.step2Title", undefined, "Upload WB") },
+    { num: 3, label: t("driverWorkflow.step3Title", undefined, "Upload Invoice") },
+    { num: 4, label: t("driverWorkflow.step4Title", undefined, "Start Trip") },
+    { num: 5, label: t("driverWorkflow.step5Title", undefined, "In Transit") },
+    { num: 6, label: t("driverWorkflow.step6Title", undefined, "Upload Stamped LR") },
+    { num: 7, label: t("driverWorkflow.step7Title", undefined, "Upload Stamped WB") },
+    { num: 8, label: t("driverWorkflow.step8Title", undefined, "Upload Stamped Invoice") },
   ];
 
   return (
@@ -6903,10 +6985,10 @@ function DriverWorkflow({
         }}
       >
         <b style={{ fontSize: 14, display: "block", marginBottom: 2 }}>
-          Trip: {trip.reference}
+          {t("nav.trips", undefined, "Trip")}: {trip.reference}
         </b>
         <span style={{ fontSize: 12, color: "var(--muted-ink)" }}>
-          {trip.origin} → {trip.destination}
+          {localizeName(trip.origin, language)} → {localizeName(trip.destination, language)}
         </span>
       </div>
 
@@ -6973,7 +7055,7 @@ function DriverWorkflow({
       {/* Step 1: Upload LR */}
       {currentStep === 1 && (
         <div className="panel" style={{ padding: 24 }}>
-          <h2 style={{ fontSize: 18, marginBottom: 16 }}>Upload LR</h2>
+          <h2 style={{ fontSize: 18, marginBottom: 16 }}>{t("driverWorkflow.step1Title")}</h2>
 
           <form onSubmit={handleStep1Submit}>
             <div
@@ -7067,7 +7149,7 @@ function DriverWorkflow({
       {/* Step 2: Upload WB */}
       {currentStep === 2 && (
         <div className="panel" style={{ padding: 24 }}>
-          <h2 style={{ fontSize: 18, marginBottom: 16 }}>Upload WB</h2>
+          <h2 style={{ fontSize: 18, marginBottom: 16 }}>{t("driverWorkflow.step2Title")}</h2>
 
           <form onSubmit={handleStep2Submit}>
             <div
@@ -7161,7 +7243,7 @@ function DriverWorkflow({
       {/* Step 3: Upload Invoice */}
       {currentStep === 3 && (
         <div className="panel" style={{ padding: 24 }}>
-          <h2 style={{ fontSize: 18, marginBottom: 16 }}>Upload Invoice</h2>
+          <h2 style={{ fontSize: 18, marginBottom: 16 }}>{t("driverWorkflow.step3Title")}</h2>
 
           <form onSubmit={handleStep3Submit}>
             <div
@@ -7255,7 +7337,7 @@ function DriverWorkflow({
       {/* Step 4: Start Trip Button */}
       {currentStep === 4 && (
         <div className="panel" style={{ padding: 24 }}>
-          <h2 style={{ fontSize: 18, marginBottom: 16 }}>Start Trip</h2>
+          <h2 style={{ fontSize: 18, marginBottom: 16 }}>{t("driverWorkflow.step4Title")}</h2>
 
           {!initialDocsVerified ? (
             <div
@@ -7303,16 +7385,16 @@ function DriverWorkflow({
               }}
             >
               <div>
-                <b>Trip:</b> {trip.reference}
+                <b>{t("nav.trips", undefined, "Trip")}:</b> {trip.reference}
               </div>
               <div>
-                <b>Customer:</b> {trip.customer}
+                <b>{t("trip.client", undefined, "Customer")}:</b> {localizeName(trip.customer, language)}
               </div>
               <div>
-                <b>Origin:</b> {trip.origin}
+                <b>{t("trip.source", undefined, "Origin")}:</b> {localizeName(trip.origin, language)}
               </div>
               <div>
-                <b>Destination:</b> {trip.destination}
+                <b>{t("trip.destination", undefined, "Destination")}:</b> {localizeName(trip.destination, language)}
               </div>
             </div>
           </div>
@@ -7331,7 +7413,7 @@ function DriverWorkflow({
               cursor: initialDocsVerified ? "pointer" : "not-allowed",
             }}
           >
-            Start Trip
+            {t("trip.startTrip", undefined, "Start Trip")}
           </button>
         </div>
       )}
@@ -7339,7 +7421,7 @@ function DriverWorkflow({
       {/* Step 5: In Transit */}
       {currentStep === 5 && (
         <div className="panel" style={{ padding: 24 }}>
-          <h2 style={{ fontSize: 18, marginBottom: 16 }}>In Transit</h2>
+          <h2 style={{ fontSize: 18, marginBottom: 16 }}>{t("statuses.IN_TRANSIT")}</h2>
 
           {/* Map Preview */}
           <div
@@ -7528,10 +7610,10 @@ function DriverWorkflow({
                       background: "var(--surface)",
                     }}
                   >
-                    <option value="Fuel">Fuel</option>
-                    <option value="Cash">Cash</option>
-                    <option value="AdBlue">AdBlue</option>
-                    <option value="Other">Other</option>
+                    <option value="Fuel">{t("modals.extraModal.fuel")}</option>
+                    <option value="Cash">{t("modals.extraModal.cash")}</option>
+                    <option value="AdBlue">{t("modals.extraModal.adBlue")}</option>
+                    <option value="Other">{t("modals.extraModal.other")}</option>
                   </select>
                 </label>
 
@@ -7684,7 +7766,7 @@ function DriverWorkflow({
                 justifyContent: "space-between",
               }}
             >
-              <span>Previously Submitted Requests</span>
+              <span>{t("approvals.allTab")}</span>
               <span
                 style={{
                   fontSize: 12,
@@ -7830,7 +7912,7 @@ function DriverWorkflow({
       {/* Step 6: Upload Stamped LR */}
       {currentStep === 6 && (
         <div className="panel" style={{ padding: 24 }}>
-          <h2 style={{ fontSize: 18, marginBottom: 16 }}>Upload Stamped LR</h2>
+          <h2 style={{ fontSize: 18, marginBottom: 16 }}>{t("trip.stampedLr")}</h2>
 
           <form onSubmit={handleStep6Submit}>
             <div
@@ -7924,7 +8006,7 @@ function DriverWorkflow({
       {/* Step 7: Upload Stamped WB */}
       {currentStep === 7 && (
         <div className="panel" style={{ padding: 24 }}>
-          <h2 style={{ fontSize: 18, marginBottom: 16 }}>Upload Stamped WB</h2>
+          <h2 style={{ fontSize: 18, marginBottom: 16 }}>{t("trip.stampedWb")}</h2>
 
           <form onSubmit={handleStep7Submit}>
             <div
@@ -8247,7 +8329,7 @@ function DriverWorkflow({
                   color: "#15803d",
                 }}
               >
-                Trip Completed! 🎉
+                {t("driverWorkflow.congratsTitle")}
               </h2>
               <p
                 style={{
@@ -8270,7 +8352,7 @@ function DriverWorkflow({
                   fontWeight: 700,
                 }}
               >
-                Finish
+                {t("driverWorkflow.finishBtn")}
               </button>
             </>
           )}
