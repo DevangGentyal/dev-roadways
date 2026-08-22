@@ -3,8 +3,16 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Dev Roadways | Operations',
-  description: 'Coordinate trip requests, journeys, drivers, and operational extras in one clear workspace.',
+  title: 'Dev Roadways',
+  description:
+    'Coordinate trip requests, journeys, drivers, and operational extras in one clear workspace.',
+  applicationName: 'Dev Roadways',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: 'Dev Roadways',
+    statusBarStyle: 'default',
+  },
   generator: 'Dev Roadways',
   icons: {
     icon: [
@@ -27,9 +35,13 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   colorScheme: 'light dark',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: 'white' },
-    { media: '(prefers-color-scheme: dark)', color: 'black' },
+    { media: '(prefers-color-scheme: dark)', color: '#0f172a' },
   ],
 }
 

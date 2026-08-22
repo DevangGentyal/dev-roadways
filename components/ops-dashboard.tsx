@@ -191,6 +191,11 @@ type Vehicle = {
   type: "Body" | "Bulker" | "Open";
 };
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
 const ROLE_GREETINGS: Record<Role, string> = {
   Coordinator: "Govind",
   Operations: "Laxman",
@@ -518,6 +523,10 @@ export default function OpsDashboard() {
     null,
   );
   const [toast, setToast] = useState("");
+  const [installPromptEvent, setInstallPromptEvent] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
 
   const [activeDriverFlow, setActiveDriverFlow] =
     useState<DriverFlowState | null>(null);
@@ -548,6 +557,105 @@ export default function OpsDashboard() {
       updateDriverFlowState(null);
     }
   }, [role, activeDriverFlow, activeDriverTrip]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const isStandalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      // @ts-expect-error iOS Safari only
+      window.navigator.standalone === true;
+    if (isStandalone) {
+      localStorage.setItem("pwa_installed", "true");
+      return;
+    }
+
+    const dismissed = localStorage.getItem("pwa_install_dismissed") === "true";
+    const installed = localStorage.getItem("pwa_installed") === "true";
+    if (!dismissed && !installed) {
+      setShowInstallBanner(false);
+    }
+
+    const onBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      const promptEvent = event as BeforeInstallPromptEvent;
+      setInstallPromptEvent(promptEvent);
+      if (!dismissed && !installed) {
+        setShowInstallBanner(true);
+      }
+    };
+
+    const onAppInstalled = () => {
+      localStorage.setItem("pwa_installed", "true");
+      localStorage.removeItem("pwa_install_dismissed");
+      setShowInstallBanner(false);
+      setInstallPromptEvent(null);
+    };
+
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+      return;
+    }
+
+    let reloaded = false;
+    const onControllerChange = () => {
+      if (reloaded) return;
+      reloaded = true;
+      window.location.reload();
+    };
+
+    navigator.serviceWorker.register("/sw.js").then((registration) => {
+      if (registration.waiting) {
+        registration.waiting.postMessage({ type: "SKIP_WAITING" });
+      }
+
+      registration.addEventListener("updatefound", () => {
+        const installing = registration.installing;
+        if (!installing) return;
+        installing.addEventListener("statechange", () => {
+          if (
+            installing.state === "installed" &&
+            navigator.serviceWorker.controller
+          ) {
+            installing.postMessage({ type: "SKIP_WAITING" });
+          }
+        });
+      });
+    });
+
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener(
+        "controllerchange",
+        onControllerChange,
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const syncOfflineState = () => setIsOffline(!window.navigator.onLine);
+    syncOfflineState();
+
+    window.addEventListener("online", syncOfflineState);
+    window.addEventListener("offline", syncOfflineState);
+
+    return () => {
+      window.removeEventListener("online", syncOfflineState);
+      window.removeEventListener("offline", syncOfflineState);
+    };
+  }, []);
 
   // Synchronize driver availability based on active/ongoing trips
   useEffect(() => {
@@ -602,6 +710,26 @@ export default function OpsDashboard() {
     setToast(msg);
     window.setTimeout(() => setToast(""), 2800);
   };
+
+  async function installApp() {
+    if (!installPromptEvent) return;
+    await installPromptEvent.prompt();
+    const choice = await installPromptEvent.userChoice;
+    if (choice.outcome === "accepted") {
+      localStorage.setItem("pwa_installed", "true");
+      localStorage.removeItem("pwa_install_dismissed");
+      setShowInstallBanner(false);
+    } else {
+      localStorage.setItem("pwa_install_dismissed", "true");
+      setShowInstallBanner(false);
+    }
+    setInstallPromptEvent(null);
+  }
+
+  function dismissInstallBanner() {
+    localStorage.setItem("pwa_install_dismissed", "true");
+    setShowInstallBanner(false);
+  }
 
   const newCount = trips.filter((t) => t.status === "NEW").length;
   const visibleTrips =
@@ -1185,6 +1313,31 @@ export default function OpsDashboard() {
             <div className="panel db-state">Loading mock database…</div>
           )}
           {dbError && <div className="panel db-state error">{dbError}</div>}
+          {isOffline && (
+            <div className="offline-banner">
+              <b>Offline mode</b>
+              <span>
+                You&apos;re viewing cached app shell content. Live mock data will
+                load again when the connection returns.
+              </span>
+            </div>
+          )}
+          {showInstallBanner && (
+            <div className="install-banner">
+              <div>
+                <b>Install Dev Roadways</b>
+                <p>Get quick access, offline-ready app shell, and faster return visits.</p>
+              </div>
+              <div className="install-actions">
+                <button className="button secondary compact" onClick={dismissInstallBanner} type="button">
+                  Not now
+                </button>
+                <button className="button primary compact" onClick={installApp} type="button">
+                  Install App
+                </button>
+              </div>
+            </div>
+          )}
           {dbReady && (
             <>
               {!isDriverFlowLocked && (

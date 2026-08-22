@@ -314,6 +314,62 @@ nav {
   padding: 22px 20px 28px;
 }
 
+.install-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.install-banner b {
+  display: block;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.install-banner p {
+  margin: 4px 0 0;
+  color: var(--muted-ink);
+  font-size: 12px;
+}
+
+.install-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.offline-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.offline-banner b {
+  display: block;
+  color: #1d4ed8;
+  font-size: 13px;
+}
+
+.offline-banner span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .page-heading,
 .detail-heading {
   display: flex;
