@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import {
   House,
   Truck,
@@ -1324,6 +1325,26 @@ export default function OpsDashboard() {
           )}
           {showInstallBanner && (
             <div className="install-banner">
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  position: "relative",
+                  flexShrink: 0,
+                  borderRadius: 14,
+                  overflow: "hidden",
+                  border: "1px solid #dbeafe",
+                  background: "#eff6ff",
+                }}
+              >
+                <Image
+                  src="/icon.svg"
+                  alt="Dev Roadways"
+                  fill
+                  priority
+                  style={{ objectFit: "cover", transform: "scale(1.18)" }}
+                />
+              </div>
               <div>
                 <b>Install Dev Roadways</b>
                 <p>Get quick access, offline-ready app shell, and faster return visits.</p>

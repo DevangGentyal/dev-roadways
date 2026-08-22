@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export default function OfflinePage() {
   return (
     <div
@@ -25,19 +27,23 @@ export default function OfflinePage() {
       >
         <div
           style={{
-            width: 56,
-            height: 56,
+            width: 68,
+            height: 68,
             margin: "0 auto 16px",
-            borderRadius: 18,
-            display: "grid",
-            placeItems: "center",
+            borderRadius: 20,
+            overflow: "hidden",
+            border: "1px solid #dbeafe",
             background: "#eff6ff",
-            color: "#2563eb",
-            fontSize: 24,
-            fontWeight: 800,
+            position: "relative",
           }}
         >
-          D
+          <Image
+            src="/icon.svg"
+            alt="Dev Roadways"
+            fill
+            priority
+            style={{ objectFit: "cover", transform: "scale(1.18)" }}
+          />
         </div>
         <h1 style={{ margin: 0, fontSize: 24, letterSpacing: "-0.03em" }}>
           You are offline
