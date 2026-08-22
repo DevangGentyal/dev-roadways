@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import {
   House,
   Truck,
@@ -190,11 +189,6 @@ type Vehicle = {
   mileage_kmpl: number;
   load_capacity: string;
   type: "Body" | "Bulker" | "Open";
-};
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
 const ROLE_GREETINGS: Record<Role, string> = {
@@ -524,9 +518,6 @@ export default function OpsDashboard() {
     null,
   );
   const [toast, setToast] = useState("");
-  const [installPromptEvent, setInstallPromptEvent] =
-    useState<BeforeInstallPromptEvent | null>(null);
-  const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
 
   const [activeDriverFlow, setActiveDriverFlow] =
@@ -558,49 +549,6 @@ export default function OpsDashboard() {
       updateDriverFlowState(null);
     }
   }, [role, activeDriverFlow, activeDriverTrip]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const isStandalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      // @ts-expect-error iOS Safari only
-      window.navigator.standalone === true;
-    if (isStandalone) {
-      localStorage.setItem("pwa_installed", "true");
-      return;
-    }
-
-    const dismissed = localStorage.getItem("pwa_install_dismissed") === "true";
-    const installed = localStorage.getItem("pwa_installed") === "true";
-    if (!dismissed && !installed) {
-      setShowInstallBanner(false);
-    }
-
-    const onBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      const promptEvent = event as BeforeInstallPromptEvent;
-      setInstallPromptEvent(promptEvent);
-      if (!dismissed && !installed) {
-        setShowInstallBanner(true);
-      }
-    };
-
-    const onAppInstalled = () => {
-      localStorage.setItem("pwa_installed", "true");
-      localStorage.removeItem("pwa_install_dismissed");
-      setShowInstallBanner(false);
-      setInstallPromptEvent(null);
-    };
-
-    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-    window.addEventListener("appinstalled", onAppInstalled);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", onAppInstalled);
-    };
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
@@ -711,26 +659,6 @@ export default function OpsDashboard() {
     setToast(msg);
     window.setTimeout(() => setToast(""), 2800);
   };
-
-  async function installApp() {
-    if (!installPromptEvent) return;
-    await installPromptEvent.prompt();
-    const choice = await installPromptEvent.userChoice;
-    if (choice.outcome === "accepted") {
-      localStorage.setItem("pwa_installed", "true");
-      localStorage.removeItem("pwa_install_dismissed");
-      setShowInstallBanner(false);
-    } else {
-      localStorage.setItem("pwa_install_dismissed", "true");
-      setShowInstallBanner(false);
-    }
-    setInstallPromptEvent(null);
-  }
-
-  function dismissInstallBanner() {
-    localStorage.setItem("pwa_install_dismissed", "true");
-    setShowInstallBanner(false);
-  }
 
   const newCount = trips.filter((t) => t.status === "NEW").length;
   const visibleTrips =
@@ -1321,48 +1249,6 @@ export default function OpsDashboard() {
                 You&apos;re viewing cached app shell content. Live mock data will
                 load again when the connection returns.
               </span>
-            </div>
-          )}
-          {showInstallBanner && (
-            <div className="install-banner">
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  position: "relative",
-                  flexShrink: 0,
-                  borderRadius: 12,
-                  overflow: "hidden",
-                  border: "1px solid #dbeafe",
-                  background: "#eff6ff",
-                }}
-              >
-                <Image
-                  src="/icon.svg"
-                  alt="Dev Roadways"
-                  fill
-                  priority
-                  style={{ objectFit: "cover", transform: "scale(1.18)" }}
-                />
-              </div>
-              <b>Dev Roadways</b>
-              <div className="install-actions">
-                <button
-                  className="button primary compact"
-                  onClick={installApp}
-                  type="button"
-                >
-                  Install App
-                </button>
-                <button
-                  className="install-close"
-                  aria-label="Dismiss install prompt"
-                  onClick={dismissInstallBanner}
-                  type="button"
-                >
-                  <X size={16} />
-                </button>
-              </div>
             </div>
           )}
           {dbReady && (

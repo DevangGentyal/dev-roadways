@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-globals */
-const CACHE_VERSION = 'v1.0.0'
+const CACHE_VERSION = 'v2026-08-22'
 const STATIC_CACHE = `dev-roadways-static-${CACHE_VERSION}`
+const RUNTIME_CACHE = `dev-roadways-runtime-${CACHE_VERSION}`
 
 const STATIC_ASSETS = [
   '/',
@@ -24,7 +25,13 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key.startsWith('dev-roadways-static-') && key !== STATIC_CACHE)
+          .filter(
+            (key) =>
+              (key.startsWith('dev-roadways-static-') ||
+                key.startsWith('dev-roadways-runtime-')) &&
+              key !== STATIC_CACHE &&
+              key !== RUNTIME_CACHE,
+          )
           .map((key) => caches.delete(key)),
       ),
     ),
@@ -49,10 +56,16 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(async () => {
-        const cachedOffline = await caches.match('/offline');
-        return cachedOffline || caches.match('/');
-      }),
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone()
+          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy))
+          return response
+        })
+        .catch(async () => {
+          const cachedOffline = await caches.match(request)
+          return cachedOffline || caches.match('/offline') || caches.match('/')
+        }),
     )
     return
   }
@@ -68,14 +81,15 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('.webmanifest')
   ) {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached
-        return fetch(request).then((response) => {
+      fetch(request)
+        .then((response) => {
           const copy = response.clone()
           caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy))
           return response
         })
-      }),
+        .catch(() =>
+          caches.match(request).then((cached) => cached || caches.match('/')),
+        ),
     )
   }
 })
