@@ -441,16 +441,28 @@ export default function OpsDashboard() {
     "All" | "Fuel" | "Cash" | "AdBlue"
   >("All");
   const [approvalStatusTab, setApprovalStatusTab] = useState<
-    "Pending" | "Approved" | "All"
-  >("Pending");
+    "Approved" | "All"
+  >("All");
   const [fuelReportTab, setFuelReportTab] = useState<"basic" | "extra">(
     "basic",
   );
   const [fuelReportStatus, setFuelReportStatus] = useState("All");
   const [cashReportStatus, setCashReportStatus] = useState("All");
 
-  const changeView = (targetView: string) => {
-    const allowedViews =
+  const changeView = (
+    targetView:
+      | "dashboard"
+      | "trips"
+      | "trip-detail"
+      | "followups"
+      | "fuel"
+      | "reports-ops"
+      | "reports-fuel"
+      | "reports-cash"
+      | "approvals"
+      | "active",
+  ) => {
+    const allowedViews: Array<typeof targetView> =
       role === "Driver"
         ? ["dashboard", "active", "trips", "trip-detail"]
         : role === "Coordinator"
@@ -480,12 +492,12 @@ export default function OpsDashboard() {
   }, [role, view]);
 
   const pendingApprovalsCount = allExtras.filter(
-    (x) => x.status === "Pending",
+    (x) => x.status === "Submitted",
   ).length;
 
   function handleNavigateApprovals(
     type: "Fuel" | "Cash" | "AdBlue" | "All" = "All",
-    status: "Pending" | "Approved" | "All" = "Pending",
+    status: "Approved" | "All" = "All",
   ) {
     setApprovalFilterType(type);
     setApprovalStatusTab(status);
@@ -1446,10 +1458,13 @@ export default function OpsDashboard() {
                   />
                 )}
               {view === "reports-ops" && (
-                <TripOpsReport trips={trips} onMetricClick={(f) => {
+                  <TripOpsReport
+                    trips={trips}
+                    onMetricClick={(f: string) => {
                   setTripsFilter(f);
                   setView("trips");
-                }} />
+                    }}
+                  />
               )}
               {view === "reports-fuel" && (
                 <FuelReportsPage
@@ -1790,7 +1805,15 @@ function Dashboard({
   fuelTransactions: FuelTransaction[];
   role: Role;
   activeDriverFlow?: DriverFlowState | null;
-  onMetricClick: (f: string) => void;
+  onMetricClick: (
+    f:
+      | "New"
+      | "Driver Pending"
+      | "In Transit"
+      | "Docs Uploaded"
+      | "Complete"
+      | "Rejected (Ops)",
+  ) => void;
   onOpenFuel?: () => void;
   onAcceptTrip?: (t: Trip) => void;
   onRejectTrip?: (t: Trip) => void;
@@ -1956,6 +1979,35 @@ function Stat({
         <small>{hint}</small>
       </div>
     </button>
+  );
+}
+
+type ApprovalStatus = "Submitted" | "Approved" | "Rejected";
+
+function ApprovalStatusBadge({ status }: { status: ApprovalStatus }) {
+  const styles =
+    status === "Approved"
+      ? { background: "#dcfce7", color: "#15803d" }
+      : status === "Rejected"
+        ? { background: "#fee2e2", color: "#b91c1c" }
+        : { background: "#fef3c7", color: "#b45309" };
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minWidth: 88,
+        padding: "4px 10px",
+        borderRadius: 999,
+        fontSize: 11,
+        fontWeight: 700,
+        ...styles,
+      }}
+    >
+      {status}
+    </span>
   );
 }
 
@@ -4785,9 +4837,11 @@ function DocumentModal({
 function TripOpsReport({
   trips,
   onOpenTrip,
+  onMetricClick,
 }: {
   trips: Trip[];
   onOpenTrip?: (trip: Trip) => void;
+  onMetricClick?: (filter: string) => void;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string>("All");
@@ -5355,7 +5409,7 @@ function CashAdvancesPage({
   trips: Trip[];
   extras: Extra[];
   initialStatus?: string;
-  onNavigateApprovals?: (type: "Fuel" | "Cash" | "AdBlue" | "All", status?: "Pending" | "Approved" | "All") => void;
+  onNavigateApprovals?: (type: "Fuel" | "Cash" | "AdBlue" | "All", status?: "Approved" | "All") => void;
 }) {
   const cashRecords = extras.filter((e) => e.type === "Cash");
   const [statusFilter, setStatusFilter] = useState(initialStatus);
@@ -5376,7 +5430,7 @@ function CashAdvancesPage({
           <h2>Cash Advances Report</h2>
           <p>Track trip cash advances and request approvals.</p>
         </div>
-        <button className="button secondary compact" onClick={() => onNavigateApprovals?.("Cash", "Pending")}>Open Approvals</button>
+        <button className="button secondary compact" onClick={() => onNavigateApprovals?.("Cash", "All")}>Open Approvals</button>
       </div>
       <div className="filters">
         <div className="search"><MagnifyingGlass size={16} style={{ color: "#9ca6b4", marginRight: 4 }} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search trip, driver, reason..." /></div>
@@ -5396,7 +5450,7 @@ function CashAdvancesPage({
                   <td style={{ padding: "0.75rem 1rem" }}>{row.note}</td>
                   <td style={{ padding: "0.75rem 1rem" }}>{formatDDMMYY(row.requestedAt)}</td>
                   <td style={{ padding: "0.75rem 1rem" }}>{formatDDMMYY(row.approvedAt)}</td>
-                  <td style={{ padding: "0.75rem 1rem" }}><ApprovalStatusBadge status={row.status as ApprovalStatus} /></td>
+                  <td style={{ padding: "0.75rem 1rem" }}><ApprovalStatusBadge status={row.status} /></td>
                 </tr>
               );
             })}
@@ -5418,7 +5472,7 @@ function FuelReportsPage({
   extras: Extra[];
   initialTab?: "basic" | "extra";
   initialStatus?: string;
-  onNavigateApprovals?: (type: "Fuel" | "Cash" | "AdBlue" | "All", status?: "Pending" | "Approved" | "All") => void;
+  onNavigateApprovals?: (type: "Fuel" | "Cash" | "AdBlue" | "All", status?: "Approved" | "All") => void;
 }) {
   const [tab, setTab] = useState<"basic" | "extra">(initialTab);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
@@ -5429,7 +5483,7 @@ function FuelReportsPage({
     <div className="panel">
       <div className="panel-header">
         <div><h2>Fuel &amp; Extra Fuel Reports</h2><p>Review basic fuel and extra requests.</p></div>
-        <button className="button secondary compact" onClick={() => onNavigateApprovals?.("Fuel", "Pending")}>Open Approvals</button>
+        <button className="button secondary compact" onClick={() => onNavigateApprovals?.("Fuel", "All")}>Open Approvals</button>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         <button className={tab === "basic" ? "filter active" : "filter"} onClick={() => setTab("basic")}>Basic Fuel</button>
@@ -5444,20 +5498,20 @@ function ApprovalsHub({
   extras,
   trips,
   initialFilter = "All",
-  initialStatusTab = "Pending",
+  initialStatusTab = "Approved",
   onApprove,
   onReject,
 }: {
   extras: Extra[];
   trips: Trip[];
   initialFilter?: "All" | "Fuel" | "Cash" | "AdBlue";
-  initialStatusTab?: "Pending" | "Approved" | "All";
+  initialStatusTab?: "Approved" | "All";
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onOpenTrip?: (tripId: string) => void;
   onNavigateReports?: (reportView: "reports-fuel" | "reports-cash" | "reports-ops", tab?: "basic" | "extra", status?: string) => void;
 }) {
-  const pendingList = extras.filter((x) => x.status === "Pending" || x.status === "Submitted");
+  const pendingList = extras.filter((x) => x.status === "Submitted");
   return (
     <div className="panel">
       <div className="panel-header"><div><h2>Super Admin Approvals</h2><p>Approve or reject extra requests.</p></div></div>
